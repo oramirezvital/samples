@@ -37,7 +37,7 @@ const Chat = ({ userName = "Guest User" }) => {
   const [query, setQuery] = React.useState("");
   const [sessionId, setSessionId] = React.useState(uuidv4());
   const [errorMessage, setErrorMessage] = React.useState("");
-  const [height, setHeight] = React.useState(480);
+  const [height, setHeight] = React.useState('auto');
   const [size, setSize] = React.useState([0, 0]);
 
   const borderRadius = 8;
@@ -264,9 +264,8 @@ const Chat = ({ userName = "Guest User" }) => {
         sx={{
           display: "flex",
           flexDirection: "column",
-          height: height,
-          overflow: "hidden",
-          overflowY: "scroll",
+          minHeight: "100%",
+          pb: 2,
         }}
       >
         {answers.length > 0 ? (
@@ -566,45 +565,23 @@ const Chat = ({ userName = "Guest User" }) => {
             textAlign={"center"}
             sx={{
               pl: 1,
-              pt: 1,
+              pt: 2,
               pr: 1,
-              pb: 6,
-              height: height,
+              pb: 2,
+              minHeight: 120,
               display: "flex",
-              alignItems: "flex-end",
+              alignItems: "center",
             }}
           >
             <div style={{ width: "100%" }}>
-              <img
-                src="/images/strands-logo.svg"
-                alt="Strands Agents SDK"
-                height={128}
-              />
-              <Typography
-                variant="h5"
-                sx={(theme) => ({
-                  pb: 1,
-                  fontWeight: 500,
-                  background: `linear-gradient(to right, 
-                  ${theme.palette.text.primary}, 
-                  ${theme.palette.primary.dark}, 
-                  ${theme.palette.text.primary})`,
-                  backgroundClip: "text",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  textFillColor: "transparent",
-                })}
-              >
-                Strands Agents SDK
-              </Typography>
-              <Typography sx={{ pb: 4, fontWeight: 400 }}>
-                Open-source framework leveraging modern language models to build powerful AI agents through minimal, model-driven code.
-              </Typography>
               <Typography
                 color="primary"
-                sx={{ fontSize: "1.1rem", pb: 1, fontWeight: 500 }}
+                sx={{ fontSize: "1.3rem", pb: 0.5, fontWeight: 600 }}
               >
                 {WELCOME_MESSAGE}
+              </Typography>
+              <Typography sx={{ color: "#666666", fontWeight: 400, pb: 1 }}>
+                Ask me anything about your fleet management data and operations.
               </Typography>
             </div>
           </Box>

@@ -17,6 +17,7 @@ import "@fontsource/roboto/500.css";
 import "@fontsource/roboto/700.css";
 import { alpha } from "@mui/material/styles";
 import Chat from "./Chat";
+import KPIDashboard from "./KPIDashboard";
 
 import { APP_NAME } from "../env";
 import Dialog from "@mui/material/Dialog";
@@ -144,9 +145,44 @@ function LayoutApp() {
           </Box>
         </Toolbar>
       </AppBar>
-      <Container disableGutters maxWidth="xl" component="main">
-        <Chat userName={userName} />
-      </Container>
+      
+      {/* KPI Dashboard - Fixed at top */}
+      <KPIDashboard />
+      
+      {/* Chat Container with scroll */}
+      <Box
+        sx={{
+          height: 'calc(100vh - 420px)', // Adjust based on header + KPI height
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column'
+        }}
+      >
+        <Container 
+          disableGutters 
+          maxWidth="xl" 
+          component="main"
+          sx={{
+            height: '100%',
+            overflow: 'auto',
+            '&::-webkit-scrollbar': {
+              width: '8px',
+            },
+            '&::-webkit-scrollbar-track': {
+              background: '#f1f1f1',
+            },
+            '&::-webkit-scrollbar-thumb': {
+              background: '#E30613',
+              borderRadius: '4px',
+            },
+            '&::-webkit-scrollbar-thumb:hover': {
+              background: '#B8050F',
+            },
+          }}
+        >
+          <Chat userName={userName} />
+        </Container>
+      </Box>
       <Box textAlign={"center"}>
         <Typography
           variant="body2"
