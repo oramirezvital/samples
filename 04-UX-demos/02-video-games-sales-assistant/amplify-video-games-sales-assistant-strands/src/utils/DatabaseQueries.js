@@ -99,6 +99,28 @@ export const kpiQueries = {
       ROUND(SUM(data_usage_mb + data_usage_roaming_mb) / 1024.0 / 1024.0, 2) as total_tb
     FROM daily_usage 
     WHERE usage_date = CURRENT_DATE;
+  `,
+  
+  usageTotals: `
+    SELECT 
+      ROUND(SUM(data_usage_mb + data_usage_roaming_mb) / 1024.0, 2) as total_data_gb,
+      ROUND(SUM(voice_usage_minutes + voice_usage_roaming_minutes), 0) as total_voice_minutes,
+      SUM(sms_usage_count + sms_usage_roaming_count) as total_sms_count
+    FROM daily_usage 
+    WHERE usage_date >= CURRENT_DATE - INTERVAL '30 days';
+  `,
+  
+  usageTotalsDaily: `
+    SELECT 
+      DATE(usage_date) as date,
+      ROUND(SUM(data_usage_mb + data_usage_roaming_mb) / 1024.0, 2) as daily_data_gb,
+      ROUND(SUM(voice_usage_minutes + voice_usage_roaming_minutes), 0) as daily_voice_minutes,
+      SUM(sms_usage_count + sms_usage_roaming_count) as daily_sms_count
+    FROM daily_usage 
+    WHERE usage_date >= CURRENT_DATE - INTERVAL '7 days'
+    GROUP BY DATE(usage_date)
+    ORDER BY date DESC
+    LIMIT 7;
   `
 };
 
@@ -147,6 +169,24 @@ export const parseQueryResult = (result, queryType) => {
       
       case 'todayUsage':
         return [{ total_tb: 68.2 }];
+      
+      case 'usageTotals':
+        return [{ 
+          total_data_gb: 2048.5, 
+          total_voice_minutes: 125000, 
+          total_sms_count: 45000 
+        }];
+      
+      case 'usageTotalsDaily':
+        return [
+          { date: '2025-08-02', daily_data_gb: 68.2, daily_voice_minutes: 4200, daily_sms_count: 1800 },
+          { date: '2025-08-01', daily_data_gb: 75.1, daily_voice_minutes: 4500, daily_sms_count: 2100 },
+          { date: '2025-07-31', daily_data_gb: 49.8, daily_voice_minutes: 3800, daily_sms_count: 1600 },
+          { date: '2025-07-30', daily_data_gb: 65.3, daily_voice_minutes: 4100, daily_sms_count: 1900 },
+          { date: '2025-07-29', daily_data_gb: 38.7, daily_voice_minutes: 3200, daily_sms_count: 1400 },
+          { date: '2025-07-28', daily_data_gb: 52.4, daily_voice_minutes: 3900, daily_sms_count: 1700 },
+          { date: '2025-07-27', daily_data_gb: 45.9, daily_voice_minutes: 3600, daily_sms_count: 1500 }
+        ];
       
       default:
         return [];

@@ -8,7 +8,8 @@ const KPIDashboard = () => {
     dailyUsage: { loading: true, data: null, value: '0 TB' },
     simInventory: { loading: true, data: null, value: '0' },
     lineSubscriptions: { loading: true, data: null, value: '0' },
-    devices: { loading: true, data: null, value: '0' }
+    devices: { loading: true, data: null, value: '0' },
+    usageTotals: { loading: true, data: null, value: '0' }
   });
 
   const [refreshInterval, setRefreshInterval] = useState(null);
@@ -25,14 +26,18 @@ const KPIDashboard = () => {
         lineSubscriptionsResult,
         devicesResult,
         totalDevicesResult,
-        todayUsageResult
+        todayUsageResult,
+        usageTotalsResult,
+        usageTotalsDailyResult
       ] = await Promise.all([
         executeDirectQuery(kpiQueries.dailyUsage, 'Daily usage trend'),
         executeDirectQuery(kpiQueries.simInventory, 'SIM inventory status'),
         executeDirectQuery(kpiQueries.lineSubscriptions, 'Total active lines'),
         executeDirectQuery(kpiQueries.devices, 'Device types'),
         executeDirectQuery(kpiQueries.totalDevices, 'Total devices'),
-        executeDirectQuery(kpiQueries.todayUsage, 'Today usage')
+        executeDirectQuery(kpiQueries.todayUsage, 'Today usage'),
+        executeDirectQuery(kpiQueries.usageTotals, 'Usage totals'),
+        executeDirectQuery(kpiQueries.usageTotalsDaily, 'Daily usage totals')
       ]);
 
       // Parse results
@@ -42,9 +47,11 @@ const KPIDashboard = () => {
       const devicesData = parseQueryResult(devicesResult, 'devices');
       const totalDevicesData = parseQueryResult(totalDevicesResult, 'totalDevices');
       const todayUsageData = parseQueryResult(todayUsageResult, 'todayUsage');
+      const usageTotalsData = parseQueryResult(usageTotalsResult, 'usageTotals');
+      const usageTotalsDailyData = parseQueryResult(usageTotalsDailyResult, 'usageTotalsDaily');
 
       // Process and update state with real data
-      updateKPIData(dailyUsageData, simInventoryData, lineSubscriptionsData, devicesData, totalDevicesData, todayUsageData);
+      updateKPIData(dailyUsageData, simInventoryData, lineSubscriptionsData, devicesData, totalDevicesData, todayUsageData, usageTotalsData, usageTotalsDailyData);
 
     } catch (error) {
       console.error('Error fetching real data:', error);
@@ -53,7 +60,7 @@ const KPIDashboard = () => {
     }
   };
 
-  const updateKPIData = (dailyUsageData, simInventoryData, lineSubscriptionsData, devicesData, totalDevicesData, todayUsageData) => {
+  const updateKPIData = (dailyUsageData, simInventoryData, lineSubscriptionsData, devicesData, totalDevicesData, todayUsageData, usageTotalsData, usageTotalsDailyData) => {
     // Process daily usage data
     const usageValues = dailyUsageData.map(item => item.total_gb);
     const usageDates = dailyUsageData.map(item => {
@@ -89,6 +96,21 @@ const KPIDashboard = () => {
       }
     });
     const totalDevices = totalDevicesData[0]?.total_devices || 0;
+
+    // Process usage totals data
+    const usageTotals = usageTotalsData[0] || { total_data_gb: 0, total_voice_minutes: 0, total_sms_count: 0 };
+    const totalDataGB = usageTotals.total_data_gb || 0;
+    const totalVoiceMinutes = usageTotals.total_voice_minutes || 0;
+    const totalSMSCount = usageTotals.total_sms_count || 0;
+
+    // Process daily usage totals for chart
+    const dailyDataValues = usageTotalsDailyData.map(item => item.daily_data_gb);
+    const dailyVoiceValues = usageTotalsDailyData.map(item => Math.round(item.daily_voice_minutes / 1000)); // Convert to thousands
+    const dailySMSValues = usageTotalsDailyData.map(item => Math.round(item.daily_sms_count / 100)); // Convert to hundreds
+    const dailyDates = usageTotalsDailyData.map(item => {
+      const date = new Date(item.date);
+      return date.toLocaleDateString('en-US', { weekday: 'short' });
+    });
 
     // Update state with processed data
     setKpiData({
@@ -240,12 +262,64 @@ const KPIDashboard = () => {
             }
           }
         }
+      },
+      usageTotals: {
+        loading: false,
+        value: `${totalDataGB.toLocaleString()} GB`,
+        data: {
+          series: [
+            {
+              name: 'Data (GB)',
+              data: dailyDataValues.reverse()
+            },
+            {
+              name: 'Voice (K min)',
+              data: dailyVoiceValues.reverse()
+            },
+            {
+              name: 'SMS (100s)',
+              data: dailySMSValues.reverse()
+            }
+          ],
+          options: {
+            chart: {
+              type: 'line',
+              height: 180,
+              toolbar: { show: false },
+              sparkline: { enabled: true }
+            },
+            stroke: {
+              curve: 'smooth',
+              colors: ['#E30613', '#666666', '#CCCCCC'],
+              width: 2
+            },
+            xaxis: {
+              categories: dailyDates.reverse()
+            },
+            colors: ['#E30613', '#666666', '#CCCCCC'],
+            tooltip: {
+              y: [
+                {
+                  formatter: (val) => `${val} GB`
+                },
+                {
+                  formatter: (val) => `${val}K minutes`
+                },
+                {
+                  formatter: (val) => `${val * 100} SMS`
+                }
+              ]
+            },
+            legend: {
+              show: false
+            }
+          }
+        }
       }
     });
 
-    console.log('KPI data updated with real database values');
+    console.log('KPI data updated with real database values including usage totals');
   };
-
   const setMockData = () => {
     console.log('Using mock data for KPIs');
     setKpiData({
@@ -377,6 +451,46 @@ const KPIDashboard = () => {
             dataLabels: { enabled: false }
           }
         }
+      },
+      usageTotals: {
+        loading: false,
+        value: '2,048 GB',
+        data: {
+          series: [
+            {
+              name: 'Data (GB)',
+              data: [45, 52, 38, 65, 49, 75, 68]
+            },
+            {
+              name: 'Voice (K min)',
+              data: [3.6, 4.5, 3.2, 4.1, 3.8, 3.9, 4.2]
+            },
+            {
+              name: 'SMS (100s)',
+              data: [15, 21, 14, 19, 16, 17, 18]
+            }
+          ],
+          options: {
+            chart: {
+              type: 'line',
+              height: 180,
+              toolbar: { show: false },
+              sparkline: { enabled: true }
+            },
+            stroke: {
+              curve: 'smooth',
+              colors: ['#E30613', '#666666', '#CCCCCC'],
+              width: 2
+            },
+            xaxis: {
+              categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+            },
+            colors: ['#E30613', '#666666', '#CCCCCC'],
+            legend: {
+              show: false
+            }
+          }
+        }
       }
     });
   };
@@ -450,7 +564,7 @@ const KPIDashboard = () => {
   return (
     <Box sx={{ p: 2, backgroundColor: '#F8F9FA' }}>
       <Grid container spacing={3}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2.4}>
           <KPICard
             title="Daily Usage"
             value={kpiData.dailyUsage.value}
@@ -459,7 +573,7 @@ const KPIDashboard = () => {
             loading={kpiData.dailyUsage.loading}
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2.4}>
           <KPICard
             title="SIM Inventory"
             value={kpiData.simInventory.value}
@@ -468,7 +582,7 @@ const KPIDashboard = () => {
             loading={kpiData.simInventory.loading}
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2.4}>
           <KPICard
             title="Line Subscriptions"
             value={kpiData.lineSubscriptions.value}
@@ -477,13 +591,22 @@ const KPIDashboard = () => {
             loading={kpiData.lineSubscriptions.loading}
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2.4}>
           <KPICard
             title="Devices"
             value={kpiData.devices.value}
             subtitle="Total managed devices"
             chart={kpiData.devices.data}
             loading={kpiData.devices.loading}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={2.4}>
+          <KPICard
+            title="Usage Totals"
+            value={kpiData.usageTotals.value}
+            subtitle="Data, voice & SMS (30 days)"
+            chart={kpiData.usageTotals.data}
+            loading={kpiData.usageTotals.loading}
           />
         </Grid>
       </Grid>
