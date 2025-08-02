@@ -1,37 +1,316 @@
 <db_tables_available>
 <tables>
     <table>
-    <table_name>video_games_sales_units</table_name>
-    <table_description>This is a table for units sold of video games globally; the information is for 64,016 titles released from 1971 to 2024. Each record in the table contains a video game title (unique) with the total units sold for each region (1 North America, 2 Japan, 3 European Union (EU), and 4 the rest of the world), critics' scores, genres, consoles, and more.</table_description>
+    <table_name>enterprises</table_name>
+    <table_description>Master table containing B2B customer companies that subscribe to wireless fleet management services. Each enterprise represents a business customer with multiple devices and users.</table_description>
     <table_schema>
-    video_games_sales_units (
-        title TEXT, -- Only include this column in queries to search for a specific title of video game name
-        console TEXT,
-        genre TEXT,
-        publisher TEXT,
-        developer TEXT,
-        critic_score NUMERIC(3,1),
-        na_sales NUMERIC(4,2),
-        jp_sales NUMERIC(4,2),
-        pal_sales NUMERIC(4,2),
-        other_sales NUMERIC(4,2),
-        release_date DATE
+    enterprises (
+        enterprise_id UUID PRIMARY KEY,
+        company_name VARCHAR(255) NOT NULL,
+        tax_id VARCHAR(50) NOT NULL UNIQUE,
+        industry_type VARCHAR(100),
+        company_size company_size_enum DEFAULT 'MEDIUM',
+        primary_contact_name VARCHAR(255),
+        primary_contact_email VARCHAR(255),
+        primary_contact_phone VARCHAR(20),
+        billing_address_line1 VARCHAR(255),
+        billing_address_line2 VARCHAR(255),
+        billing_city VARCHAR(100),
+        billing_state VARCHAR(100),
+        billing_country VARCHAR(100),
+        billing_postal_code VARCHAR(20),
+        credit_limit NUMERIC(15,2) DEFAULT 0.00,
+        payment_terms INTEGER DEFAULT 30,
+        account_status account_status_enum DEFAULT 'ACTIVE',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        created_by UUID
     )
     </table_schema>
-    <data_dictionary>The Video Games Sales Units table has the following structure/schema:
-    title: Game title
-    console: Console the game was released for
-    genre: Genre of the game
-    publisher: Publisher of the game
-    developer: Developer of the game
-    critic_score: Metacritic score (out of 10)
-    na_sales: North American sales of copies in millions (units)
-    jp_sales: Japanese sales of copies in millions (units)
-    pal_sales: European & African sales of copies in millions (units)
-    other_sales: Rest of world sales of copies in millions (units)
-    release_date: Date the game was released on
+    <data_dictionary>
+    enterprise_id: Unique identifier for each enterprise customer
+    company_name: Business name of the enterprise customer
+    tax_id: Tax identification number (unique per enterprise)
+    industry_type: Industry sector (e.g., Healthcare, Manufacturing, Retail)
+    company_size: Size category (SMALL, MEDIUM, LARGE, ENTERPRISE)
+    primary_contact_*: Main business contact information
+    billing_address_*: Billing address details
+    credit_limit: Maximum credit limit in dollars
+    payment_terms: Payment terms in days (e.g., 30, 60, 90)
+    account_status: Current account status (ACTIVE, SUSPENDED, CLOSED)
+    created_at/updated_at: Timestamp tracking
+    </data_dictionary>
+    </table>
+
+    <table>
+    <table_name>enterprise_subscriptions</table_name>
+    <table_description>Subscription contracts between enterprises and the wireless carrier. Each enterprise can have multiple subscriptions with different terms and conditions.</table_description>
+    <table_schema>
+    enterprise_subscriptions (
+        subscription_id UUID PRIMARY KEY,
+        enterprise_id UUID NOT NULL REFERENCES enterprises(enterprise_id),
+        subscription_name VARCHAR(255) NOT NULL,
+        contract_start_date DATE NOT NULL,
+        contract_end_date DATE NOT NULL,
+        contract_type contract_type_enum NOT NULL,
+        auto_renewal BOOLEAN DEFAULT FALSE,
+        billing_cycle billing_cycle_enum DEFAULT 'MONTHLY',
+        billing_day INTEGER DEFAULT 1,
+        currency_code CHAR(3) DEFAULT 'USD',
+        volume_discount_percent NUMERIC(5,2) DEFAULT 0.00,
+        early_termination_fee NUMERIC(10,2) DEFAULT 0.00,
+        status subscription_status_enum DEFAULT 'ACTIVE',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+    </table_schema>
+    <data_dictionary>
+    subscription_id: Unique identifier for each subscription contract
+    enterprise_id: Which enterprise owns this subscription
+    subscription_name: Name/description of the subscription
+    contract_start_date/contract_end_date: Contract period
+    contract_type: Type of contract (ANNUAL, MULTI_YEAR, MONTH_TO_MONTH)
+    auto_renewal: Whether contract auto-renews
+    billing_cycle: How often billing occurs (MONTHLY, QUARTERLY, ANNUALLY)
+    billing_day: Day of month for billing (1-28)
+    currency_code: Currency for billing (USD, EUR, etc.)
+    volume_discount_percent: Discount percentage for volume
+    early_termination_fee: Fee for early contract termination
+    status: Subscription status (ACTIVE, SUSPENDED, CANCELLED, EXPIRED)
+    </data_dictionary>
+    </table>
+
+    <table>
+    <table_name>devices</table_name>
+    <table_description>Inventory of mobile devices (phones, tablets, IoT devices) assigned to enterprise customers. Each device can be associated with a SIM card and assigned to specific users within an enterprise.</table_description>
+    <table_schema>
+    devices (
+        device_id UUID PRIMARY KEY,
+        sim_id UUID REFERENCES sim_inventory(sim_id),
+        enterprise_id UUID NOT NULL REFERENCES enterprises(enterprise_id),
+        location_id UUID REFERENCES enterprise_locations(location_id),
+        device_name VARCHAR(255),
+        device_type device_type_enum NOT NULL,
+        manufacturer VARCHAR(100),
+        model VARCHAR(100),
+        imei VARCHAR(15),
+        assigned_user VARCHAR(255),
+        department VARCHAR(100),
+        cost_center VARCHAR(50),
+        status device_status_enum DEFAULT 'ACTIVE',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+    </table_schema>
+    <data_dictionary>
+    device_id: Unique identifier for each device
+    sim_id: Reference to associated SIM card
+    enterprise_id: Which enterprise owns this device
+    location_id: Physical location assignment
+    device_name: Custom name for the device
+    device_type: Type of device (SMARTPHONE, TABLET, IOT_DEVICE, HOTSPOT)
+    manufacturer: Device manufacturer (Apple, Samsung, etc.)
+    model: Specific device model
+    imei: International Mobile Equipment Identity
+    assigned_user: Name of user assigned to device
+    department: Department within enterprise
+    cost_center: Cost center for billing allocation
+    status: Device status (ACTIVE, INACTIVE, SUSPENDED, LOST, DAMAGED)
+    </data_dictionary>
+    </table>
+
+    <table>
+    <table_name>line_subscriptions</table_name>
+    <table_description>Individual wireless service line subscriptions. Each line represents a wireless service (voice/data plan) associated with a SIM card and potentially a device. Lines belong to enterprise subscriptions.</table_description>
+    <table_schema>
+    line_subscriptions (
+        line_subscription_id UUID PRIMARY KEY,
+        subscription_id UUID NOT NULL REFERENCES enterprise_subscriptions(subscription_id),
+        sim_id UUID NOT NULL REFERENCES sim_inventory(sim_id),
+        plan_id UUID NOT NULL REFERENCES service_plans(plan_id),
+        device_id UUID REFERENCES devices(device_id),
+        location_id UUID REFERENCES enterprise_locations(location_id),
+        line_nickname VARCHAR(255),
+        cost_center VARCHAR(50),
+        department VARCHAR(100),
+        service_start_date DATE NOT NULL,
+        service_end_date DATE,
+        status line_status_enum DEFAULT 'ACTIVE',
+        suspension_reason VARCHAR(255),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+    </table_schema>
+    <data_dictionary>
+    line_subscription_id: Unique identifier for each line subscription
+    subscription_id: Reference to enterprise subscription (NOT directly to enterprise)
+    sim_id: Associated SIM card
+    plan_id: Service plan being used
+    device_id: Associated device (if any)
+    location_id: Service location
+    line_nickname: Custom name for the line
+    cost_center/department: Billing and organizational allocation
+    service_start_date/service_end_date: Service period
+    status: Line status (ACTIVE, SUSPENDED, CANCELLED)
+    suspension_reason: Reason for suspension if applicable
+    </data_dictionary>
+    </table>
+
+    <table>
+    <table_name>daily_usage</table_name>
+    <table_description>Daily usage tracking for each line subscription including data, voice, and SMS usage both domestic and roaming.</table_description>
+    <table_schema>
+    daily_usage (
+        usage_id UUID PRIMARY KEY,
+        line_subscription_id UUID NOT NULL REFERENCES line_subscriptions(line_subscription_id),
+        usage_date DATE NOT NULL,
+        data_usage_mb NUMERIC(15,3) DEFAULT 0,
+        data_usage_roaming_mb NUMERIC(15,3) DEFAULT 0,
+        voice_usage_minutes NUMERIC(10,2) DEFAULT 0,
+        voice_usage_roaming_minutes NUMERIC(10,2) DEFAULT 0,
+        sms_usage_count INTEGER DEFAULT 0,
+        sms_usage_roaming_count INTEGER DEFAULT 0,
+        primary_country_code CHAR(2),
+        roaming_countries TEXT[],
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+    </table_schema>
+    <data_dictionary>
+    usage_id: Unique identifier for each daily usage record
+    line_subscription_id: Which line this usage belongs to
+    usage_date: Date of usage
+    data_usage_mb: Domestic data usage in megabytes
+    data_usage_roaming_mb: Roaming data usage in megabytes
+    voice_usage_minutes: Domestic voice usage in minutes
+    voice_usage_roaming_minutes: Roaming voice usage in minutes
+    sms_usage_count: Domestic SMS count
+    sms_usage_roaming_count: Roaming SMS count
+    primary_country_code: Primary country of usage
+    roaming_countries: Array of countries where roaming occurred
+    </data_dictionary>
+    </table>
+
+    <table>
+    <table_name>bills</table_name>
+    <table_description>Monthly billing statements for enterprise customers containing total charges and billing details.</table_description>
+    <table_schema>
+    bills (
+        bill_id UUID PRIMARY KEY,
+        enterprise_id UUID NOT NULL REFERENCES enterprises(enterprise_id),
+        bill_number VARCHAR(50) NOT NULL UNIQUE,
+        billing_period_start DATE NOT NULL,
+        billing_period_end DATE NOT NULL,
+        subtotal_amount NUMERIC(15,2) DEFAULT 0.00,
+        tax_amount NUMERIC(15,2) DEFAULT 0.00,
+        total_amount NUMERIC(15,2) DEFAULT 0.00,
+        due_date DATE NOT NULL,
+        payment_status payment_status_enum DEFAULT 'PENDING',
+        payment_date DATE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+    </table_schema>
+    <data_dictionary>
+    bill_id: Unique identifier for each bill
+    enterprise_id: Which enterprise this bill belongs to
+    bill_number: Human-readable bill number
+    billing_period_start/end: Billing period dates
+    subtotal_amount: Pre-tax total
+    tax_amount: Tax charges
+    total_amount: Final amount due
+    due_date: Payment due date
+    payment_status: Payment status (PENDING, PAID, OVERDUE, PARTIAL)
+    payment_date: Date payment was received
+    </data_dictionary>
+    </table>
+
+    <table>
+    <table_name>service_plans</table_name>
+    <table_description>Available wireless service plans with data allowances, pricing, and features.</table_description>
+    <table_schema>
+    service_plans (
+        plan_id UUID PRIMARY KEY,
+        plan_name VARCHAR(255) NOT NULL,
+        plan_type plan_type_enum NOT NULL,
+        data_allowance_mb BIGINT,
+        voice_allowance_minutes INTEGER,
+        sms_allowance_count INTEGER,
+        monthly_price NUMERIC(10,2) NOT NULL,
+        overage_data_rate NUMERIC(6,4),
+        overage_voice_rate NUMERIC(6,4),
+        overage_sms_rate NUMERIC(6,4),
+        international_roaming BOOLEAN DEFAULT FALSE,
+        plan_status plan_status_enum DEFAULT 'ACTIVE',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+    </table_schema>
+    <data_dictionary>
+    plan_id: Unique identifier for each service plan
+    plan_name: Marketing name of the plan
+    plan_type: Type of plan (UNLIMITED, METERED, POOLED, IOT)
+    data_allowance_mb: Monthly data allowance in MB (NULL for unlimited)
+    voice_allowance_minutes: Monthly voice allowance in minutes
+    sms_allowance_count: Monthly SMS allowance count
+    monthly_price: Base monthly price in dollars
+    overage_*_rate: Per-unit overage rates
+    international_roaming: Whether international roaming is included
+    plan_status: Plan availability status (ACTIVE, DEPRECATED, DISCONTINUED)
+    </data_dictionary>
+    </table>
+
+    <table>
+    <table_name>sim_inventory</table_name>
+    <table_description>SIM card inventory management including SIM status, assignments, and technical details.</table_description>
+    <table_schema>
+    sim_inventory (
+        sim_id UUID PRIMARY KEY,
+        iccid VARCHAR(22) NOT NULL UNIQUE,
+        msisdn VARCHAR(15),
+        enterprise_id UUID REFERENCES enterprises(enterprise_id),
+        sim_status sim_status_enum DEFAULT 'INVENTORY',
+        activation_date DATE,
+        deactivation_date DATE,
+        last_usage_date DATE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+    </table_schema>
+    <data_dictionary>
+    sim_id: Unique identifier for each SIM card
+    iccid: Integrated Circuit Card Identifier (unique SIM identifier)
+    msisdn: Mobile Station International Subscriber Directory Number (phone number)
+    enterprise_id: Which enterprise owns this SIM (if assigned)
+    sim_status: Current status (INVENTORY, ACTIVE, SUSPENDED, DEACTIVATED, LOST)
+    activation_date: When SIM was first activated
+    deactivation_date: When SIM was deactivated (if applicable)
+    last_usage_date: Last date of recorded usage
     </data_dictionary>
     </table>
 </tables>
-<business_rules></business_rules>
+
+<business_rules>
+- **IMPORTANT RELATIONSHIPS**: 
+  - To get enterprise data for line subscriptions: enterprises → enterprise_subscriptions → line_subscriptions
+  - To get enterprise data for devices: enterprises → devices (direct relationship)
+  - To get enterprise data for bills: enterprises → bills (direct relationship)
+  
+- **Key Joins**:
+  - enterprises.enterprise_id = enterprise_subscriptions.enterprise_id
+  - enterprise_subscriptions.subscription_id = line_subscriptions.subscription_id
+  - enterprises.enterprise_id = devices.enterprise_id
+  - enterprises.enterprise_id = bills.enterprise_id
+
+- **Status Values**:
+  - line_subscriptions.status: 'ACTIVE', 'SUSPENDED', 'CANCELLED'
+  - devices.status: 'ACTIVE', 'INACTIVE', 'SUSPENDED', 'LOST', 'DAMAGED'
+  - enterprises.account_status: 'ACTIVE', 'SUSPENDED', 'CLOSED'
+
+- Each enterprise can have multiple subscriptions
+- Each subscription can have multiple line subscriptions
+- Each line subscription is associated with one SIM card
+- Each device can be associated with one SIM card at a time
+- Daily usage is tracked per line subscription
+- Bills are generated monthly per enterprise and contain charges for all their services
+</business_rules>
 </db_tables_available>

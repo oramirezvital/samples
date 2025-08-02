@@ -41,10 +41,22 @@ function LayoutApp() {
   const defaultTheme = createTheme({
     palette: {
       primary: {
-        main: "#5BC167",
+        main: "#E30613", // Claro Red
+        dark: "#B8050F", // Darker red
+        light: "#FF4757", // Lighter red
       },
       secondary: {
-        main: "#E8734A",
+        main: "#000000", // Black
+        dark: "#1A1A1A", // Dark gray
+        light: "#333333", // Light gray
+      },
+      background: {
+        default: "#FFFFFF",
+        paper: "#FAFAFA",
+      },
+      text: {
+        primary: "#000000",
+        secondary: "#333333",
       },
     },
   });
@@ -68,7 +80,8 @@ function LayoutApp() {
         color="default"
         elevation={0}
         sx={{
-          background: "#FAFFFB",
+          background: "linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%)",
+          borderBottom: "2px solid #E30613",
           position: "relative",
           "&::after": {
             content: '""',
@@ -79,28 +92,49 @@ function LayoutApp() {
             height: "1px",
             backgroundImage: (theme) => `linear-gradient(to right, 
                                   ${theme.palette.divider}, 
-                                  ${alpha(theme.palette.primary.main, 0.3)}, 
+                                  ${alpha("#E30613", 0.5)}, 
                                   ${theme.palette.divider})`,
           },
         }}
       >
         <Toolbar sx={{ flexWrap: "wrap", p: 1, m: 0 }}>
+          <Box sx={{ display: "flex", alignItems: "center", mr: 2 }}>
+            <img 
+              src="/logo.png" 
+              alt="Logo" 
+              style={{ 
+                height: "50px", 
+                width: "auto",
+                marginRight: "12px"
+              }} 
+            />
+          </Box>
           <Typography
             variant="h6"
-            color="primary"
             noWrap
-            sx={{ flexGrow: 1, p: 0, m: 0 }}
+            sx={{ 
+              flexGrow: 1, 
+              p: 0, 
+              m: 0,
+              color: "#000000",
+              fontWeight: 600,
+            }}
           >
             {APP_NAME}
           </Typography>
           <Box sx={{ display: { xs: "none", sm: "inline" } }}>
             <Chip
               sx={{
-                border: 0,
+                border: "1px solid #E30613",
                 fontSize: "0.95em",
-                color: (theme) => theme.palette.primary.dark, // Sets text color to primary dark
+                color: "#000000", // Black text
+                backgroundColor: "#FFFFFF",
                 "& .MuiChip-icon": {
-                  color: (theme) => theme.palette.primary.dark, // Sets icon color to primary dark
+                  color: "#E30613", // Red icon
+                },
+                "&:hover": {
+                  backgroundColor: "#FFF5F5",
+                  borderColor: "#B8050F",
                 },
               }}
               label={userName}

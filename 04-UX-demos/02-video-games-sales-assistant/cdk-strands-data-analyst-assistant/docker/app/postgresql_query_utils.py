@@ -8,8 +8,10 @@ from decimal import Decimal
 
 # Environment variables
 ENV = {
-    "SECRET_NAME": os.environ.get("SECRET_NAME"),
     "POSTGRESQL_HOST": os.environ.get("POSTGRESQL_HOST"),
+    "POSTGRESQL_PORT": os.environ.get("POSTGRESQL_PORT", "5432"),
+    "POSTGRESQL_USER": os.environ.get("POSTGRESQL_USER"),
+    "POSTGRESQL_PASSWORD": os.environ.get("POSTGRESQL_PASSWORD"),
     "DATABASE_NAME": os.environ.get("DATABASE_NAME"),
     "QUESTION_ANSWERS_TABLE": os.environ.get("QUESTION_ANSWERS_TABLE"),
     "MAX_RESPONSE_SIZE_BYTES": int(os.environ.get("MAX_RESPONSE_SIZE_BYTES", 25600)),
@@ -24,64 +26,47 @@ def validate_environment():
     Raises:
         EnvironmentError: If any required environment variables are missing
     """
-    required_vars = ["SECRET_NAME", "POSTGRESQL_HOST", "DATABASE_NAME"]
+    required_vars = ["POSTGRESQL_HOST", "POSTGRESQL_USER", "POSTGRESQL_PASSWORD", "DATABASE_NAME"]
     missing_vars = [var for var in required_vars if not ENV[var]]
     
     if missing_vars:
         raise EnvironmentError(f"Missing required environment variables: {', '.join(missing_vars)}")
 
 
-def get_secret(secret_name: str, region_name: str) -> dict:
+def get_database_credentials() -> dict:
     """
-    Retrieves a secret from AWS Secrets Manager.
+    Returns database credentials from environment variables.
     
-    Args:
-        secret_name: Name of the secret in AWS Secrets Manager
-        region_name: AWS region where the secret is stored
-        
     Returns:
-        dict: The secret values as a dictionary
-        
-    Raises:
-        ClientError: If there's an error retrieving the secret
+        dict: Database connection parameters
     """
-    # Create a Secrets Manager client
-    session = boto3.session.Session()
-    client = session.client(service_name="secretsmanager", region_name=region_name)
+    return {
+        "host": ENV["POSTGRESQL_HOST"],
+        "port": int(ENV["POSTGRESQL_PORT"]),
+        "username": ENV["POSTGRESQL_USER"],
+        "password": ENV["POSTGRESQL_PASSWORD"],
+        "dbname": ENV["DATABASE_NAME"]
+    }
     print("get secret")
-    try:
-        get_secret_value_response = client.get_secret_value(SecretId=secret_name)
-    except ClientError as e:
-        # For a list of exceptions thrown, see
-        # https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
-        raise e
-    secret = json.loads(get_secret_value_response["SecretString"])
-    return secret
-
-
-def get_postgresql_connection(secret_name: str, aws_region: str, postgresql_host: str, database_name: str):
+def get_postgresql_connection():
     """
-    Establishes a connection to PostgreSQL using credentials from Secrets Manager.
+    Establishes a connection to PostgreSQL using credentials from environment variables.
     
-    Args:
-        secret_name: Name of the secret containing database credentials
-        aws_region: AWS region where the secret is stored
-        postgresql_host: PostgreSQL server hostname
-        database_name: Name of the database to connect to
-        
     Returns:
         Connection object if successful, False otherwise
     """
-    secret = get_secret(secret_name, aws_region)
-    print(secret)
+    validate_environment()
+    credentials = get_database_credentials()
+    
     try:
         conn = psycopg2.connect(
-            host=postgresql_host,
-            database=database_name,
-            user=secret["username"],
-            password=secret["password"],
+            host=credentials["host"],
+            port=credentials["port"],
+            database=credentials["dbname"],
+            user=credentials["username"],
+            password=credentials["password"],
         )
-        print("Connected to the PostgreSQL database!")
+        print("Connected to the fleet management PostgreSQL database!")
     except (Exception, psycopg2.Error) as error:
         print("Error connecting to the PostgreSQL database:", error)
         return False
@@ -120,19 +105,14 @@ def run_sql_query_on_postgresql(sql_query: str) -> str:
         # Validate environment variables before proceeding
         validate_environment()
         
-        connection = get_postgresql_connection(
-            ENV["SECRET_NAME"], 
-            ENV["AWS_REGION"], 
-            ENV["POSTGRESQL_HOST"], 
-            ENV["DATABASE_NAME"]
-        )
+        connection = get_postgresql_connection()
 
         if connection == False:
             return json.dumps({
-                "error": "Something went wrong connecting to the database, ask the user to try again later."
+                "error": "Something went wrong connecting to the fleet management database, ask the user to try again later."
             })
 
-        print("connected")
+        print("connected to fleet management database")
 
         message = ""
         cur = connection.cursor()

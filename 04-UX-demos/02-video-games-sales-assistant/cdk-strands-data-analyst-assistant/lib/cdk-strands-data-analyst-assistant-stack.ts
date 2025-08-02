@@ -24,8 +24,34 @@ export class CdkStrandsDataAnalystAssistantStack extends cdk.Stack {
 
     const databaseName = new cdk.CfnParameter(this, "DatabaseName", {
       type: "String",
-      description: "Nombre de la base de datos",
-      default: "video_games_sales",
+      description: "Fleet management database name",
+      default: "fleetmanagement",
+    });
+
+    // Parameters for existing RDS database connection
+    const existingDbHost = new cdk.CfnParameter(this, "ExistingDbHost", {
+      type: "String",
+      description: "Existing RDS PostgreSQL database host",
+      default: "fleet-management-db.cxhelbn5konu.us-east-1.rds.amazonaws.com",
+    });
+
+    const existingDbPort = new cdk.CfnParameter(this, "ExistingDbPort", {
+      type: "Number",
+      description: "Existing RDS PostgreSQL database port",
+      default: 5432,
+    });
+
+    const existingDbUser = new cdk.CfnParameter(this, "ExistingDbUser", {
+      type: "String",
+      description: "Existing RDS PostgreSQL database username",
+      default: "fleetadmin",
+    });
+
+    const existingDbPassword = new cdk.CfnParameter(this, "ExistingDbPassword", {
+      type: "String",
+      description: "Existing RDS PostgreSQL database password",
+      noEcho: true,
+      default: "FleetMgmt2024!",
     });
 
     // Add a new parameter for max response size in bytes
@@ -91,6 +117,7 @@ export class CdkStrandsDataAnalystAssistantStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY
     });
 
+    // Create new VPC for the application
     const vpc = new ec2.Vpc(this, "AssistantVPC", {
       vpcName: `${projectId.valueAsString}-vpc`,
       ipAddresses: ec2.IpAddresses.cidr("10.0.0.0/21"),
@@ -136,74 +163,74 @@ export class CdkStrandsDataAnalystAssistantStack extends cdk.Stack {
       "Allow PostgreSQL connections"
     );
 
-    const databaseUsername = "postgres";
+    // Using existing RDS database instead of creating Aurora cluster
+    // const databaseUsername = "postgres";
+    // const secret = new rds.DatabaseSecret(this, "AssistantSecret", {
+    //   username: databaseUsername,
+    //   secretName: `${projectId.valueAsString}-db-secret`,
+    // });
 
-    const secret = new rds.DatabaseSecret(this, "AssistantSecret", {
-      username: databaseUsername,
-      secretName: `${projectId.valueAsString}-db-secret`,
-    });
+    // Create IAM role for Aurora to access S3 (commented out for existing DB)
+    // const auroraS3Role = new iam.Role(this, "AuroraS3Role", {
+    //   assumedBy: new iam.ServicePrincipal("rds.amazonaws.com"),
+    // });
 
-    // Create IAM role for Aurora to access S3
-    const auroraS3Role = new iam.Role(this, "AuroraS3Role", {
-      assumedBy: new iam.ServicePrincipal("rds.amazonaws.com"),
-    });
+    // let cluster = new rds.DatabaseCluster(this, "AssistantCluster", {
+    //   engine: rds.DatabaseClusterEngine.auroraPostgres({
+    //     version: rds.AuroraPostgresEngineVersion.VER_15_4,
+    //   }),
+    //   writer: rds.ClusterInstance.serverlessV2("writer"),
+    //   serverlessV2MinCapacity: 2,
+    //   serverlessV2MaxCapacity: 4,
+    //   defaultDatabaseName: databaseName.valueAsString,
+    //   vpc,
+    //   vpcSubnets: {
+    //     subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+    //   },
+    //   securityGroups: [sg_db_proxy],
+    //   credentials: rds.Credentials.fromSecret(secret),
+    //   removalPolicy: cdk.RemovalPolicy.DESTROY,
+    //   enableDataApi: true,
+    //   s3ImportRole: auroraS3Role,
+    // });
 
-    let cluster = new rds.DatabaseCluster(this, "AssistantCluster", {
-      engine: rds.DatabaseClusterEngine.auroraPostgres({
-        version: rds.AuroraPostgresEngineVersion.VER_15_4,
-      }),
-      writer: rds.ClusterInstance.serverlessV2("writer"),
-      serverlessV2MinCapacity: 2,
-      serverlessV2MaxCapacity: 4,
-      defaultDatabaseName: databaseName.valueAsString,
-      vpc,
-      vpcSubnets: {
-        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
-      },
-      securityGroups: [sg_db_proxy],
-      credentials: rds.Credentials.fromSecret(secret),
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-      enableDataApi: true,
-      s3ImportRole: auroraS3Role,
-    });
+    // Grant S3 access to the role (commented out for existing DB)
+    // auroraS3Role.addToPolicy(
+    //   new iam.PolicyStatement({
+    //     effect: iam.Effect.ALLOW,
+    //     actions: ["s3:GetObject", "s3:ListBucket", "s3:GetBucketLocation"],
+    //     resources: [
+    //       `arn:aws:s3:::${projectId.valueAsString}-${this.region}-${this.account}-import`,
+    //       `arn:aws:s3:::${projectId.valueAsString}-${this.region}-${this.account}-import/*`,
+    //     ],
+    //   })
+    // );
 
-    // Grant S3 access to the role
-    auroraS3Role.addToPolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ["s3:GetObject", "s3:ListBucket", "s3:GetBucketLocation"],
-        resources: [
-          `arn:aws:s3:::${projectId.valueAsString}-${this.region}-${this.account}-import`,
-          `arn:aws:s3:::${projectId.valueAsString}-${this.region}-${this.account}-import/*`,
-        ],
-      })
-    );
+    // Add additional RDS permissions similar to your CloudFormation template (commented out for existing DB)
+    // auroraS3Role.addToPolicy(
+    //   new iam.PolicyStatement({
+    //     effect: iam.Effect.ALLOW,
+    //     actions: [
+    //       "rds:CreateDBSnapshot",
+    //       "rds:CreateDBClusterSnapshot",
+    //       "rds:RestoreDBClusterFromSnapshot",
+    //       "rds:RestoreDBClusterToPointInTime",
+    //       "rds:RestoreDBInstanceFromDBSnapshot",
+    //       "rds:RestoreDBInstanceToPointInTime",
+    //     ],
+    //     resources: [cluster.clusterArn],
+    //   })
+    // );
 
-    // Add additional RDS permissions similar to your CloudFormation template
-    auroraS3Role.addToPolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: [
-          "rds:CreateDBSnapshot",
-          "rds:CreateDBClusterSnapshot",
-          "rds:RestoreDBClusterFromSnapshot",
-          "rds:RestoreDBClusterToPointInTime",
-          "rds:RestoreDBInstanceFromDBSnapshot",
-          "rds:RestoreDBInstanceToPointInTime",
-        ],
-        resources: [cluster.clusterArn],
-      })
-    );
-
-    const proxy = cluster.addProxy("AssistantProxy", {
-      dbProxyName: `${projectId.valueAsString}-db-proxy`,
-      secrets: [secret],
-      debugLogging: true,
-      vpc,
-      securityGroups: [sg_db_proxy],
-      requireTLS: false,
-      iamAuth: false,
-    });
+    // const proxy = cluster.addProxy("AssistantProxy", {
+    //   dbProxyName: `${projectId.valueAsString}-db-proxy`,
+    //   secrets: [secret],
+    //   debugLogging: true,
+    //   vpc,
+    //   securityGroups: [sg_db_proxy],
+    //   requireTLS: false,
+    //   iamAuth: false,
+    // });
 
     // S3 bucket for temporal resources to use with aws_s3.table_import_from_s3
     const importBucket = new s3.Bucket(this, "ImportBucket", {
@@ -261,16 +288,16 @@ export class CdkStrandsDataAnalystAssistantStack extends cdk.Stack {
       })
     );
 
-    // Add permissions to access the database
-    taskRole.addToPolicy(
-      new iam.PolicyStatement({
-        actions: ["rds-db:connect", "secretsmanager:GetSecretValue"],
-        resources: [
-          secret.secretArn,
-          `arn:aws:rds-db:${this.region}:${this.account}:dbuser:*/${databaseUsername}`,
-        ],
-      })
-    );
+    // Remove database-related permissions since we're using existing DB
+    // taskRole.addToPolicy(
+    //   new iam.PolicyStatement({
+    //     actions: ["rds-db:connect", "secretsmanager:GetSecretValue"],
+    //     resources: [
+    //       secret.secretArn,
+    //       `arn:aws:rds-db:${this.region}:${this.account}:dbuser:*/${databaseUsername}`,
+    //     ],
+    //   })
+    // );
 
     // Add permissions to put/update items in DynamoDB
     taskRole.addToPolicy(
@@ -320,10 +347,12 @@ export class CdkStrandsDataAnalystAssistantStack extends cdk.Stack {
         logGroup,
       }),
       environment: {
-        // Add any environment variables needed by your application
-        SECRET_NAME: `${projectId.valueAsString}-db-secret`,
+        // Environment variables for existing database connection
         DATABASE_NAME: databaseName.valueAsString,
-        POSTGRESQL_HOST: proxy.endpoint,
+        POSTGRESQL_HOST: existingDbHost.valueAsString,
+        POSTGRESQL_PORT: existingDbPort.valueAsString,
+        POSTGRESQL_USER: existingDbUser.valueAsString,
+        POSTGRESQL_PASSWORD: existingDbPassword.valueAsString,
         AWS_REGION: this.region,
         RAW_QUERY_RESULTS_TABLE_NAME: rawQueryResults.tableName,
         CONVERSATION_TABLE_NAME: conversationTable.tableName,
@@ -416,17 +445,17 @@ export class CdkStrandsDataAnalystAssistantStack extends cdk.Stack {
 
     // Stack outputs
 
-    new cdk.CfnOutput(this, "AuroraServerlessDBClusterARN", {
-      value: cluster.clusterArn,
-      description: "The ARN of the Aurora Serverless DB Cluster",
-      exportName: `${projectId.valueAsString}-AuroraServerlessDBClusterARN`,
-    });
+    // new cdk.CfnOutput(this, "AuroraServerlessDBClusterARN", {
+    //   value: cluster.clusterArn,
+    //   description: "The ARN of the Aurora Serverless DB Cluster",
+    //   exportName: `${projectId.valueAsString}-AuroraServerlessDBClusterARN`,
+    // });
 
-    new cdk.CfnOutput(this, "SecretARN", {
-      value: secret.secretArn,
-      description: "The ARN of the database credentials secret",
-      exportName: `${projectId.valueAsString}-SecretArn`,
-    });
+    // new cdk.CfnOutput(this, "SecretARN", {
+    //   value: secret.secretArn,
+    //   description: "The ARN of the database credentials secret",
+    //   exportName: `${projectId.valueAsString}-SecretArn`,
+    // });
   
     new cdk.CfnOutput(this, "DataSourceBucketName", {
       value: importBucket.bucketName,
@@ -445,6 +474,12 @@ export class CdkStrandsDataAnalystAssistantStack extends cdk.Stack {
       value: lb.loadBalancerDnsName,
       description: "The DNS name of the Application Load Balancer for the Strands Agent",
       exportName: `${projectId.valueAsString}-LoadBalancerDnsName`,
+    });
+
+    new cdk.CfnOutput(this, "ExistingDatabaseHost", {
+      value: existingDbHost.valueAsString,
+      description: "The host of the existing fleet management database",
+      exportName: `${projectId.valueAsString}-ExistingDatabaseHost`,
     });
   }
 }
