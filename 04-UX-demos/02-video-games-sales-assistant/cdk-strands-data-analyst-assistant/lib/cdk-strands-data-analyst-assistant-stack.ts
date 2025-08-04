@@ -19,20 +19,20 @@ export class CdkStrandsDataAnalystAssistantStack extends cdk.Stack {
     const projectId = new cdk.CfnParameter(this, "ProjectId", {
       type: "String",
       description: "Project identifier used for naming resources",
-      default: "strands-data-analyst-assistant",
+      default: "customer-care-data-analyst",
     });
 
     const databaseName = new cdk.CfnParameter(this, "DatabaseName", {
       type: "String",
-      description: "Fleet management database name",
-      default: "fleetmanagement",
+      description: "Customer care database name",
+      default: "customer_care_db",
     });
 
     // Parameters for existing RDS database connection
     const existingDbHost = new cdk.CfnParameter(this, "ExistingDbHost", {
       type: "String",
       description: "Existing RDS PostgreSQL database host",
-      default: "fleet-management-db.cxhelbn5konu.us-east-1.rds.amazonaws.com",
+      default: "customer-care-db.c2lz7w2tx92t.us-west-2.rds.amazonaws.com",
     });
 
     const existingDbPort = new cdk.CfnParameter(this, "ExistingDbPort", {
@@ -44,14 +44,14 @@ export class CdkStrandsDataAnalystAssistantStack extends cdk.Stack {
     const existingDbUser = new cdk.CfnParameter(this, "ExistingDbUser", {
       type: "String",
       description: "Existing RDS PostgreSQL database username",
-      default: "fleetadmin",
+      default: "postgres",
     });
 
     const existingDbPassword = new cdk.CfnParameter(this, "ExistingDbPassword", {
       type: "String",
       description: "Existing RDS PostgreSQL database password",
       noEcho: true,
-      default: "FleetMgmt2024!",
+      default: "CustomerCare2024!",
     });
 
     // Add a new parameter for max response size in bytes
