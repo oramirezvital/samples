@@ -113,6 +113,14 @@ export const kpiQueries = {
     WHERE DATE(start_timestamp) = CURRENT_DATE;
   `,
   
+  // Total statistics (all time)
+  totalStats: `
+    SELECT COUNT(*) as total_interactions,
+           AVG(satisfaction_score) as overall_satisfaction,
+           COUNT(CASE WHEN resolution_status = 'Resolved' THEN 1 END) * 100.0 / COUNT(*) as overall_resolution_rate
+    FROM customer_interactions;
+  `,
+  
   // Customer segment analysis
   customerSegments: `
     SELECT c.customer_segment,
@@ -229,6 +237,13 @@ export const parseQueryResult = (result, queryType) => {
           today_interactions: 1247, 
           today_satisfaction: 0.72, 
           today_resolution_rate: 78.5 
+        }];
+      
+      case 'totalStats':
+        return [{ 
+          total_interactions: 4247, 
+          overall_satisfaction: 0.73, 
+          overall_resolution_rate: 76.8 
         }];
       
       case 'customerSegments':

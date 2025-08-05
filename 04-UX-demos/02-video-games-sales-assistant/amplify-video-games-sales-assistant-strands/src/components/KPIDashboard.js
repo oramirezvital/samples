@@ -89,14 +89,16 @@ const KPIDashboard = () => {
         channelPerformanceResult,
         agentProductivityResult,
         resolutionRateResult,
-        todayStatsResult
+        todayStatsResult,
+        totalStatsResult
       ] = await Promise.all([
         executeDirectQuery(customerCareQueries.totalInteractions, 'Total interactions trend'),
         executeDirectQuery(customerCareQueries.avgSatisfaction, 'Average satisfaction trend'),
         executeDirectQuery(customerCareQueries.channelPerformance, 'Channel performance'),
         executeDirectQuery(customerCareQueries.agentProductivity, 'Agent productivity'),
         executeDirectQuery(customerCareQueries.resolutionRate, 'Resolution rate trend'),
-        executeDirectQuery(customerCareQueries.todayStats, 'Today statistics')
+        executeDirectQuery(customerCareQueries.todayStats, 'Today statistics'),
+        executeDirectQuery(kpiQueries.totalStats, 'Total statistics')
       ]);
 
       // Parse results
@@ -106,9 +108,10 @@ const KPIDashboard = () => {
       const agentProductivityData = parseQueryResult(agentProductivityResult, 'agentProductivity');
       const resolutionRateData = parseQueryResult(resolutionRateResult, 'resolutionRate');
       const todayStatsData = parseQueryResult(todayStatsResult, 'todayStats');
+      const totalStatsData = parseQueryResult(totalStatsResult, 'totalStats');
 
       // Process and update state with real data
-      updateKPIData(totalInteractionsData, avgSatisfactionData, channelPerformanceData, agentProductivityData, resolutionRateData, todayStatsData);
+      updateKPIData(totalInteractionsData, avgSatisfactionData, channelPerformanceData, agentProductivityData, resolutionRateData, todayStatsData, totalStatsData);
 
     } catch (error) {
       console.error('Error fetching customer care data:', error);
@@ -117,14 +120,14 @@ const KPIDashboard = () => {
     }
   };
 
-  const updateKPIData = (totalInteractionsData, avgSatisfactionData, channelPerformanceData, agentProductivityData, resolutionRateData, todayStatsData) => {
+  const updateKPIData = (totalInteractionsData, avgSatisfactionData, channelPerformanceData, agentProductivityData, resolutionRateData, todayStatsData, totalStatsData) => {
     // Process total interactions data
     const interactionValues = totalInteractionsData.map(item => parseInt(item.total_interactions));
     const interactionDates = totalInteractionsData.map(item => {
       const date = new Date(item.interaction_date);
       return date.toLocaleDateString('en-US', { weekday: 'short' });
     });
-    const todayInteractions = todayStatsData[0]?.today_interactions || 0;
+    const totalInteractions = totalStatsData[0]?.total_interactions || 0;
 
     // Process satisfaction data
     const satisfactionValues = avgSatisfactionData.map(item => parseFloat(item.avg_satisfaction).toFixed(2));
@@ -171,7 +174,7 @@ const KPIDashboard = () => {
     setKpiData({
       totalInteractions: {
         loading: false,
-        value: todayInteractions.toLocaleString(),
+        value: totalInteractions.toLocaleString(),
         data: {
           series: [
             {
@@ -370,7 +373,7 @@ const KPIDashboard = () => {
     setKpiData({
       totalInteractions: {
         loading: false,
-        value: '1,247',
+        value: '4,247',
         data: {
           series: [
             {
@@ -610,7 +613,7 @@ const KPIDashboard = () => {
           <KPICard
             title="Total Interactions"
             value={kpiData.totalInteractions.value}
-            subtitle="Customer interactions today"
+            subtitle="All customer interactions in database"
             chart={kpiData.totalInteractions.data}
             loading={kpiData.totalInteractions.loading}
           />

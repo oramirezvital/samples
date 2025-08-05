@@ -581,7 +581,7 @@ const Chat = ({ userName = "Guest User" }) => {
                 {WELCOME_MESSAGE}
               </Typography>
               <Typography sx={{ color: "#666666", fontWeight: 400, pb: 1 }}>
-                Ask me anything about your fleet management data and operations.
+                Ask me anything about your Customer interactions data 
               </Typography>
             </div>
           </Box>
