@@ -188,13 +188,13 @@ const KPIDashboard = () => {
             },
             stroke: {
               curve: 'smooth',
-              colors: ['#E30613'],
+              colors: ['#0066CC'],
               width: 3
             },
             xaxis: {
               categories: interactionDates.reverse()
             },
-            colors: ['#E30613'],
+            colors: ['#0066CC'],
             tooltip: {
               y: {
                 formatter: (val) => `${val} interactions`
@@ -231,10 +231,10 @@ const KPIDashboard = () => {
             },
             stroke: {
               curve: 'smooth',
-              colors: ['#E30613'],
+              colors: ['#0066CC'],
               width: 2
             },
-            colors: ['#E30613'],
+            colors: ['#0066CC'],
             xaxis: {
               categories: satisfactionDates.reverse()
             },
@@ -261,7 +261,7 @@ const KPIDashboard = () => {
               height: 180
             },
             labels: channelLabels,
-            colors: ['#E30613', '#FF4444', '#FF6666', '#FF8888', '#FFAAAA', '#CCCCCC', '#DDDDDD', '#EEEEEE'],
+            colors: ['#0066CC', '#1E88E5', '#42A5F5', '#64B5F6', '#90CAF9', '#BBDEFB', '#E3F2FD', '#F5F5F5'],
             legend: { show: false },
             dataLabels: { enabled: false },
             plotOptions: {
@@ -309,7 +309,7 @@ const KPIDashboard = () => {
                 borderRadius: 4
               }
             },
-            colors: ['#E30613'],
+            colors: ['#0066CC'],
             xaxis: {
               categories: agentLabels.slice(0, 8)
             },
@@ -341,13 +341,13 @@ const KPIDashboard = () => {
             },
             stroke: {
               curve: 'smooth',
-              colors: ['#E30613'],
+              colors: ['#0066CC'],
               width: 3
             },
             xaxis: {
               categories: resolutionDates.reverse()
             },
-            colors: ['#E30613'],
+            colors: ['#0066CC'],
             yaxis: {
               min: 0,
               max: 100
@@ -387,13 +387,13 @@ const KPIDashboard = () => {
             },
             stroke: {
               curve: 'smooth',
-              colors: ['#E30613'],
+              colors: ['#0066CC'],
               width: 3
             },
             xaxis: {
               categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
             },
-            colors: ['#E30613']
+            colors: ['#0066CC']
           }
         }
       },
@@ -425,10 +425,10 @@ const KPIDashboard = () => {
             },
             stroke: {
               curve: 'smooth',
-              colors: ['#E30613'],
+              colors: ['#0066CC'],
               width: 2
             },
-            colors: ['#E30613'],
+            colors: ['#0066CC'],
             xaxis: {
               categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
             },
@@ -450,7 +450,7 @@ const KPIDashboard = () => {
               height: 180
             },
             labels: ['Phone', 'Web Chat', 'Email', 'Mobile App', 'WhatsApp', 'In-Store', 'Social Media', 'SMS'],
-            colors: ['#E30613', '#FF4444', '#FF6666', '#FF8888', '#FFAAAA', '#CCCCCC', '#DDDDDD', '#EEEEEE'],
+            colors: ['#0066CC', '#1E88E5', '#42A5F5', '#64B5F6', '#90CAF9', '#BBDEFB', '#E3F2FD', '#F5F5F5'],
             legend: { show: false },
             dataLabels: { enabled: false },
             plotOptions: {
@@ -493,7 +493,7 @@ const KPIDashboard = () => {
                 borderRadius: 4
               }
             },
-            colors: ['#E30613'],
+            colors: ['#0066CC'],
             xaxis: {
               categories: ['María G.', 'Carlos R.', 'Ana M.', 'Luis H.', 'Carmen L.', 'Roberto S.', 'Patricia M.', 'Diego V.']
             },
@@ -520,13 +520,13 @@ const KPIDashboard = () => {
             },
             stroke: {
               curve: 'smooth',
-              colors: ['#E30613'],
+              colors: ['#0066CC'],
               width: 3
             },
             xaxis: {
               categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
             },
-            colors: ['#E30613'],
+            colors: ['#0066CC'],
             yaxis: {
               min: 0,
               max: 100
@@ -565,7 +565,7 @@ const KPIDashboard = () => {
         height: 320,
         display: 'flex',
         flexDirection: 'column',
-        borderTop: '3px solid #E30613',
+        borderTop: '3px solid #0066CC',
         transition: 'transform 0.2s ease-in-out',
         '&:hover': {
           transform: 'translateY(-2px)',
@@ -576,7 +576,7 @@ const KPIDashboard = () => {
       <Typography variant="h6" sx={{ color: '#000000', fontWeight: 600, mb: 1 }}>
         {title}
       </Typography>
-      <Typography variant="h4" sx={{ color: '#E30613', fontWeight: 700, mb: 0.5 }}>
+      <Typography variant="h4" sx={{ color: '#0066CC', fontWeight: 700, mb: 0.5 }}>
         {value}
       </Typography>
       <Typography variant="body2" sx={{ color: '#666666', mb: 2 }}>
@@ -585,7 +585,7 @@ const KPIDashboard = () => {
       <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 180 }}>
         {loading ? (
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <CircularProgress size={40} sx={{ color: '#E30613', mb: 1 }} />
+            <CircularProgress size={40} sx={{ color: '#0066CC', mb: 1 }} />
             <Typography variant="caption" sx={{ color: '#666666' }}>
               Loading data...
             </Typography>
