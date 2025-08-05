@@ -359,8 +359,7 @@ class SyntheticDataGenerator:
                 'total_interactions': len(session_data['interactions']),
                 'journey_outcome': 'completed' if goal_achieved else 'partially_completed',
                 'goal_achieved': goal_achieved,
-                'cross_channel_journey': len(session_data['channels_used']) > 1,
-                'touchpoints_count': len(session_data['interactions'])
+                'cross_channel_journey': len(session_data['channels_used']) > 1
             }
             journeys.append(journey)
         
@@ -399,13 +398,13 @@ class SyntheticDataGenerator:
             for journey in journeys:
                 f.write(f"""INSERT INTO customer_journey_sessions (
                     session_id, customer_id, session_start, session_end, total_duration_seconds,
-                    total_interactions, journey_outcome, goal_achieved, cross_channel_journey, touchpoints_count
+                    total_interactions, journey_outcome, goal_achieved, cross_channel_journey
                 ) VALUES (
                     '{journey['session_id']}', '{journey['customer_id']}',
                     '{journey['session_start']}', '{journey['session_end']}',
                     {journey['total_duration_seconds']}, {journey['total_interactions']},
                     '{journey['journey_outcome']}', {journey['goal_achieved']},
-                    {journey['cross_channel_journey']}, {journey['touchpoints_count']}
+                    {journey['cross_channel_journey']}
                 ) ON CONFLICT (session_id) DO NOTHING;\n""")
             
             f.write("\n-- Insert Interactions\n")

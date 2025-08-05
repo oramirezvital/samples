@@ -478,7 +478,7 @@ export class CdkStrandsDataAnalystAssistantStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, "ExistingDatabaseHost", {
       value: existingDbHost.valueAsString,
-      description: "The host of the existing fleet management database",
+      description: "The host of the existing customer care database",
       exportName: `${projectId.valueAsString}-ExistingDatabaseHost`,
     });
   }

@@ -163,8 +163,7 @@ INSERT INTO survey_templates (template_name, template_type, questions, trigger_c
  '{"trigger": "monthly", "conditions": {"min_interactions": 2}}'::jsonb),
 ('Bot Satisfaction', 'csat',
  '[{"question": "¿El asistente virtual resolvió tu consulta?", "type": "rating", "scale": 5, "labels": ["No, para nada", "Parcialmente", "Neutral", "Sí, en su mayoría", "Sí, completamente"]}]'::jsonb,
- '{"trigger": "interaction_end", "conditions": {"interaction_mode": "bot"}}'::jsonb)
-ON CONFLICT (template_name) DO NOTHING;
+ '{"trigger": "interaction_end", "conditions": {"interaction_mode": "bot"}}'::jsonb);
 
 -- Insert Performance Thresholds
 INSERT INTO performance_thresholds (metric_name, metric_category, warning_threshold, critical_threshold, target_value, channel_id, customer_segment) VALUES
@@ -175,8 +174,7 @@ INSERT INTO performance_thresholds (metric_name, metric_category, warning_thresh
 ('first_contact_resolution_rate', 'quality', 0.80, 0.70, 0.90, NULL, NULL),
 ('bot_automation_rate', 'efficiency', 0.60, 0.50, 0.80, NULL, NULL),
 ('queue_time_seconds', 'efficiency', 60.0, 120.0, 30.0, NULL, NULL),
-('utilization_rate', 'capacity', 0.85, 0.95, 0.75, NULL, NULL)
-ON CONFLICT (metric_name, metric_category) DO NOTHING;
+('utilization_rate', 'capacity', 0.85, 0.95, 0.75, NULL, NULL);
 
 -- Display summary of inserted data
 SELECT 'Baseline Data Summary' as summary;

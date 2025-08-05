@@ -1,16 +1,16 @@
-# Deploying a Conversational Fleet Management Assistant Solution with Strands Agents SDK
+# Deploying a Conversational Customer Care Analytics Assistant Solution with Strands Agents SDK
 
-This solution provides a Generative AI application reference that allows users to interact with B2B wireless carrier fleet management data through a natural language interface. The solution leverages **[Strands Agents SDK](https://strandsagents.com/)** to build an agent that connects to an existing PostgreSQL database, providing fleet management data analysis capabilities through a Web Application interface. The infrastructure is deployed using AWS CDK.
+This solution provides a Generative AI application reference that allows users to interact with customer care performance data through a natural language interface. The solution leverages **[Strands Agents SDK](https://strandsagents.com/)** to build an agent that connects to an existing PostgreSQL database, providing customer care analytics capabilities through a Web Application interface. The infrastructure is deployed using AWS CDK.
 
 <div align="center">
-<img src="./images/data-analyst-assistant-strands-agents-sdk.gif" alt="Conversational Fleet Management Assistant Solution with Strands Agents SDK">
+<img src="./images/data-analyst-assistant-strands-agents-sdk.gif" alt="Conversational Customer Care Analytics Assistant Solution with Strands Agents SDK">
 </div>
 
-🤖 A Fleet Management Assistant offers an approach to data analysis that enables wireless carriers to interact with their fleet management data through natural language conversations rather than complex SQL queries. This kind of assistant provides an intuitive question-answering interface for fleet operations and can be improved by offering data visualizations to enhance the user experience.
+🤖 A Customer Care Analytics Assistant offers an approach to data analysis that enables wireless carriers to interact with their customer care performance data through natural language conversations rather than complex SQL queries. This kind of assistant provides an intuitive question-answering interface for customer experience operations and can be improved by offering data visualizations to enhance the user experience.
 
 ✨ This solution enables users to:
 
-- Ask questions about fleet management data in natural language
+- Ask questions about customer care performance data in natural language
 - Receive AI-generated responses based on SQL queries to a PostgreSQL database
 - View query results in tabular format
 - Explore data through automatically generated visualizations
@@ -18,16 +18,17 @@ This solution provides a Generative AI application reference that allows users t
 
 🚀 This reference solution can help you explore use cases like:
 
-- Monitor device usage patterns and optimize service plans
-- Track billing and cost allocation across departments
-- Analyze roaming usage and identify cost optimization opportunities
-- Provide quick answers to executives about fleet performance metrics
-- Identify inactive devices and optimize inventory management
-- Monitor SIM card utilization and lifecycle management
+- Monitor bot vs human interaction performance and optimization opportunities
+- Track customer satisfaction scores (CSAT, NPS, CES) across channels
+- Analyze escalation patterns and identify improvement areas
+- Provide quick answers to executives about customer experience metrics
+- Identify high-performing channels and agents for best practice sharing
+- Monitor customer journey completion rates and friction points
+- Analyze cost per interaction and operational efficiency metrics
 
 ## Solution Overview
 
-The following architecture diagram illustrates a reference solution for a generative AI fleet management assistant that is built using Strands Agents SDK and powered by Amazon Bedrock. This assistant enables users to access structured fleet management data that is stored in an existing PostgreSQL database through a question-answering interface.
+The following architecture diagram illustrates a reference solution for a generative AI customer care analytics assistant that is built using Strands Agents SDK and powered by Amazon Bedrock. This assistant enables users to access structured customer care performance data that is stored in an existing PostgreSQL database through a question-answering interface.
 
 ![Fleet Management Assistant](./images/gen-ai-assistant-diagram.png)
 
