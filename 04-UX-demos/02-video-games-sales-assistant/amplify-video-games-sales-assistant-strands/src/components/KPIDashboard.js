@@ -110,11 +110,22 @@ const KPIDashboard = () => {
       const todayStatsData = parseQueryResult(todayStatsResult, 'todayStats');
       const totalStatsData = parseQueryResult(totalStatsResult, 'totalStats');
 
+      // Debug logging
+      console.log('Raw totalStatsResult:', totalStatsResult);
+      console.log('Parsed totalStatsData:', totalStatsData);
+      console.log('Total interactions from parsed data:', totalStatsData[0]?.total_interactions);
+
       // Process and update state with real data
       updateKPIData(totalInteractionsData, avgSatisfactionData, channelPerformanceData, agentProductivityData, resolutionRateData, todayStatsData, totalStatsData);
 
     } catch (error) {
       console.error('Error fetching customer care data:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      console.log('Database query failed, falling back to mock data');
       // Fallback to mock data if real data fails
       setMockData();
     }
