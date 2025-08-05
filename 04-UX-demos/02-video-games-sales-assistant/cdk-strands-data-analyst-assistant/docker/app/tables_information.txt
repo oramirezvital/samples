@@ -2,396 +2,190 @@
 <tables>
     <table>
     <table_name>customers</table_name>
-    <table_description>Mobile subscriber profiles with comprehensive customer experience metrics and behavioral data</table_description>
+    <table_description>Core customer information and profiles for mobile subscribers</table_description>
     <table_schema>
     customers (
-        customer_id UUID PRIMARY KEY,
-        msisdn VARCHAR(20) UNIQUE NOT NULL,
-        customer_name VARCHAR(255),
-        customer_type VARCHAR(20) CHECK (customer_type IN ('prepaid', 'postpaid', 'hybrid')),
-        region VARCHAR(10) CHECK (region IN ('R9', 'DEUR')),
-        account_status VARCHAR(20) DEFAULT 'active' CHECK (account_status IN ('active', 'suspended', 'terminated', 'churned')),
-        registration_date DATE NOT NULL,
-        last_activity_date TIMESTAMP,
-        preferred_language VARCHAR(5) DEFAULT 'es',
-        customer_segment VARCHAR(50),
-        credit_limit DECIMAL(10,2),
-        current_balance DECIMAL(10,2),
-        data_plan VARCHAR(100),
-        voice_plan VARCHAR(100),
-        customer_lifetime_value DECIMAL(12,2),
-        churn_risk_score DECIMAL(3,2),
-        nps_score INTEGER CHECK (nps_score BETWEEN -100 AND 100),
-        customer_effort_score DECIMAL(3,2),
-        total_interactions_count INTEGER DEFAULT 0,
-        successful_interactions_count INTEGER DEFAULT 0,
-        escalated_interactions_count INTEGER DEFAULT 0,
-        avg_satisfaction_score DECIMAL(3,2),
-        preferred_contact_time VARCHAR(20),
-        communication_preferences JSONB,
-        accessibility_needs JSONB,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        customer_id SERIAL PRIMARY KEY,
+        customer_name VARCHAR(100) NOT NULL,
+        email VARCHAR(150) UNIQUE,
+        phone VARCHAR(20),
+        registration_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        customer_segment VARCHAR(20) CHECK (customer_segment IN ('Premium', 'Standard', 'Basic')) DEFAULT 'Standard',
+        status VARCHAR(20) CHECK (status IN ('Active', 'Inactive', 'Suspended')) DEFAULT 'Active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     </table_schema>
     <data_dictionary>
     customer_id: Unique identifier for each customer
-    msisdn: Mobile Station International Subscriber Directory Number (phone number)
-    customer_type: Service type (prepaid, postpaid, hybrid)
-    region: Geographic region (R9 or DEUR)
-    customer_segment: Business segment (VIP, Premium, Standard, Basic)
-    customer_lifetime_value: Total value of customer relationship
-    churn_risk_score: Probability of customer churning (0.00 to 1.00)
-    nps_score: Net Promoter Score (-100 to 100)
-    customer_effort_score: Average Customer Effort Score
-    total_interactions_count: Total number of customer interactions
-    successful_interactions_count: Number of successful interactions
-    escalated_interactions_count: Number of interactions escalated to humans
-    avg_satisfaction_score: Average customer satisfaction score
+    customer_name: Full name of the customer
+    email: Customer's email address
+    phone: Customer's phone number
+    registration_date: Date when customer registered
+    customer_segment: Business segment (Premium, Standard, Basic)
+    status: Current account status (Active, Inactive, Suspended)
     </data_dictionary>
     </table>
 
     <table>
     <table_name>channels</table_name>
-    <table_description>Digital interaction channels available to customers with performance baselines and capabilities</table_description>
+    <table_description>Communication channels catalog (Phone, Email, Chat, etc.)</table_description>
     <table_schema>
     channels (
-        channel_id UUID PRIMARY KEY,
-        channel_name VARCHAR(50) UNIQUE NOT NULL,
-        channel_type VARCHAR(30) CHECK (channel_type IN ('mobile_app', 'web_app', 'interactive_menu', 'chatbot', 'social_media', 'email', 'sms', 'voice_call', 'video_call')),
-        channel_description TEXT,
-        is_active BOOLEAN DEFAULT true,
-        supports_bot BOOLEAN DEFAULT false,
-        supports_live_chat BOOLEAN DEFAULT false,
-        supports_video BOOLEAN DEFAULT false,
-        supports_file_sharing BOOLEAN DEFAULT false,
-        expected_response_time_seconds INTEGER,
-        max_concurrent_users INTEGER,
-        availability_sla DECIMAL(5,4),
-        cost_per_interaction DECIMAL(8,4),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    </table_schema>
-    <data_dictionary>
-    channel_id: Unique identifier for each channel
-    channel_name: Display name of the channel
-    channel_type: Technical type of channel
-    supports_bot: Whether channel supports bot interactions
-    supports_live_chat: Whether channel supports human agents
-    expected_response_time_seconds: Target response time
-    availability_sla: Service level agreement (e.g., 0.9999 = 99.99%)
-    cost_per_interaction: Average cost to handle one interaction
-    </data_dictionary>
-    </table>
-
-    <table>
-    <table_name>interaction_types</table_name>
-    <table_description>Comprehensive catalog of customer interaction types with SLA definitions and business impact</table_description>
-    <table_schema>
-    interaction_types (
-        interaction_type_id UUID PRIMARY KEY,
-        interaction_code VARCHAR(50) UNIQUE NOT NULL,
-        interaction_name VARCHAR(100) NOT NULL,
-        interaction_category VARCHAR(50) NOT NULL,
-        sub_category VARCHAR(50),
-        description TEXT,
-        expected_duration_seconds INTEGER,
-        complexity_level VARCHAR(20) CHECK (complexity_level IN ('low', 'medium', 'high', 'critical')),
-        requires_authentication BOOLEAN DEFAULT true,
-        requires_human_agent BOOLEAN DEFAULT false,
-        business_impact VARCHAR(20) CHECK (business_impact IN ('low', 'medium', 'high', 'critical')),
-        revenue_impact BOOLEAN DEFAULT false,
-        target_resolution_time_seconds INTEGER,
-        escalation_threshold_seconds INTEGER,
+        channel_id SERIAL PRIMARY KEY,
+        channel_name VARCHAR(50) NOT NULL UNIQUE,
+        channel_type VARCHAR(30) CHECK (channel_type IN ('Digital', 'Voice', 'In-Person')) NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     </table_schema>
     <data_dictionary>
-    interaction_code: Unique code for the interaction type (e.g., BALANCE_QUERY, TOP_UP)
-    interaction_category: Main category (billing, account, technical, sales, support)
-    complexity_level: Complexity rating affecting bot success rates
-    business_impact: Impact level on business operations
-    revenue_impact: Whether interaction generates revenue
-    target_resolution_time_seconds: SLA target for resolution
-    escalation_threshold_seconds: Time before escalation consideration
+    channel_id: Unique identifier for each channel
+    channel_name: Display name of the channel (Phone, Email, Web Chat, Mobile App, WhatsApp, In-Store, Social Media, SMS)
+    channel_type: Type category (Digital, Voice, In-Person)
+    is_active: Whether channel is currently active
     </data_dictionary>
     </table>
 
     <table>
     <table_name>agents</table_name>
-    <table_description>Bot and human agents handling customer interactions with performance metrics and availability</table_description>
+    <table_description>Customer service agents catalog</table_description>
     <table_schema>
     agents (
-        agent_id UUID PRIMARY KEY,
-        agent_code VARCHAR(50) UNIQUE NOT NULL,
-        agent_name VARCHAR(255) NOT NULL,
-        agent_type VARCHAR(20) CHECK (agent_type IN ('bot', 'human', 'hybrid', 'supervisor')),
-        specialization VARCHAR(100),
-        skill_level VARCHAR(20) CHECK (skill_level IN ('trainee', 'junior', 'senior', 'expert', 'specialist')),
-        is_active BOOLEAN DEFAULT true,
-        max_concurrent_chats INTEGER DEFAULT 1,
-        languages_supported VARCHAR(100)[],
-        total_interactions_handled INTEGER DEFAULT 0,
-        avg_handling_time_seconds DECIMAL(8,2),
-        customer_satisfaction_avg DECIMAL(3,2),
-        escalation_rate DECIMAL(5,4),
-        first_contact_resolution_rate DECIMAL(5,4),
-        work_schedule JSONB,
-        current_status VARCHAR(20) DEFAULT 'available' CHECK (current_status IN ('available', 'busy', 'break', 'offline', 'training')),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    </table_schema>
-    <data_dictionary>
-    agent_type: Type of agent (bot, human, hybrid, supervisor)
-    specialization: Area of expertise (billing, technical, sales, general)
-    skill_level: Experience level from trainee to specialist
-    languages_supported: Array of supported language codes
-    avg_handling_time_seconds: Average time to handle interactions
-    escalation_rate: Rate of escalations made by this agent
-    first_contact_resolution_rate: Rate of issues resolved on first contact
-    current_status: Real-time availability status
-    </data_dictionary>
-    </table>
-
-    <table>
-    <table_name>customer_interactions</table_name>
-    <table_description>Main fact table storing all customer interactions across channels with comprehensive CX metrics</table_description>
-    <table_schema>
-    customer_interactions (
-        interaction_id UUID PRIMARY KEY,
-        customer_id UUID NOT NULL REFERENCES customers(customer_id),
-        channel_id UUID NOT NULL REFERENCES channels(channel_id),
-        interaction_type_id UUID NOT NULL REFERENCES interaction_types(interaction_type_id),
-        session_id VARCHAR(255),
-        parent_interaction_id UUID REFERENCES customer_interactions(interaction_id),
-        start_timestamp TIMESTAMP NOT NULL,
-        end_timestamp TIMESTAMP,
-        duration_seconds INTEGER,
-        queue_time_seconds INTEGER,
-        interaction_status VARCHAR(20) CHECK (interaction_status IN ('completed', 'failed', 'abandoned', 'escalated', 'in_progress', 'transferred')),
-        resolution_status VARCHAR(20) CHECK (resolution_status IN ('resolved', 'partially_resolved', 'unresolved', 'referred')),
-        error_code VARCHAR(50),
-        error_message TEXT,
-        device_type VARCHAR(20),
-        client_type VARCHAR(50),
-        client_version VARCHAR(20),
-        operating_system VARCHAR(50),
-        browser_type VARCHAR(50),
-        screen_resolution VARCHAR(20),
-        connection_type VARCHAR(20),
-        interaction_mode VARCHAR(20) CHECK (interaction_mode IN ('bot', 'live_chat', 'self_service', 'ivr', 'video_call')),
-        bot_duration_seconds INTEGER,
-        human_duration_seconds INTEGER,
-        queue_duration_seconds INTEGER,
-        escalated_to_human BOOLEAN DEFAULT false,
-        escalation_reason VARCHAR(255),
-        escalation_timestamp TIMESTAMP,
-        primary_agent_id UUID REFERENCES agents(agent_id),
-        secondary_agent_id UUID REFERENCES agents(agent_id),
-        supervisor_involved BOOLEAN DEFAULT false,
-        customer_satisfaction_score INTEGER CHECK (customer_satisfaction_score BETWEEN 1 AND 5),
-        customer_effort_score INTEGER CHECK (customer_effort_score BETWEEN 1 AND 7),
-        net_promoter_score INTEGER CHECK (net_promoter_score BETWEEN 0 AND 10),
-        resolution_on_first_contact BOOLEAN,
-        number_of_attempts INTEGER DEFAULT 1,
-        interaction_value DECIMAL(10,2),
-        cost_to_serve DECIMAL(8,4),
-        revenue_impact DECIMAL(10,2),
-        interaction_context JSONB,
-        customer_intent VARCHAR(100),
-        sentiment_score DECIMAL(3,2),
-        language_used VARCHAR(5),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    </table_schema>
-    <data_dictionary>
-    interaction_mode: How interaction was handled (bot, live_chat, self_service, ivr, video_call)
-    bot_duration_seconds: Time spent with automated bot
-    human_duration_seconds: Time spent with human agent
-    escalated_to_human: Whether bot interaction was escalated to human
-    customer_satisfaction_score: CSAT score (1-5 scale)
-    customer_effort_score: CES score (1-7 scale)
-    net_promoter_score: NPS score (0-10 scale)
-    resolution_on_first_contact: Whether issue was resolved on first contact
-    interaction_value: Business value of the interaction
-    cost_to_serve: Cost to handle this interaction
-    sentiment_score: Customer sentiment (-1.00 to 1.00)
-    </data_dictionary>
-    </table>
-
-    <table>
-    <table_name>customer_journey_sessions</table_name>
-    <table_description>Customer journey sessions grouping related interactions with outcome measurement</table_description>
-    <table_schema>
-    customer_journey_sessions (
-        session_id UUID PRIMARY KEY,
-        customer_id UUID NOT NULL REFERENCES customers(customer_id),
-        session_start TIMESTAMP NOT NULL,
-        session_end TIMESTAMP,
-        total_duration_seconds INTEGER,
-        total_interactions INTEGER DEFAULT 0,
-        primary_channel_id UUID REFERENCES channels(channel_id),
-        journey_outcome VARCHAR(50),
-        journey_goal VARCHAR(100),
-        goal_achieved BOOLEAN,
-        cross_channel_journey BOOLEAN DEFAULT false,
-        touchpoints_count INTEGER DEFAULT 1,
-        overall_satisfaction DECIMAL(3,2),
-        overall_effort_score DECIMAL(3,2),
-        journey_completion_rate DECIMAL(5,4),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    </table_schema>
-    <data_dictionary>
-    cross_channel_journey: Whether customer used multiple channels
-    touchpoints_count: Number of interaction touchpoints in journey
-    journey_completion_rate: Rate of successful journey completion
-    overall_satisfaction: Average satisfaction across journey
-    overall_effort_score: Average effort score across journey
-    </data_dictionary>
-    </table>
-
-    <table>
-    <table_name>daily_channel_metrics</table_name>
-    <table_description>Pre-aggregated daily performance metrics by channel for reporting and analytics</table_description>
-    <table_schema>
-    daily_channel_metrics (
-        metric_id UUID PRIMARY KEY,
-        metric_date DATE NOT NULL,
-        channel_id UUID NOT NULL REFERENCES channels(channel_id),
-        total_interactions INTEGER DEFAULT 0,
-        successful_interactions INTEGER DEFAULT 0,
-        failed_interactions INTEGER DEFAULT 0,
-        abandoned_interactions INTEGER DEFAULT 0,
-        bot_interactions INTEGER DEFAULT 0,
-        live_chat_interactions INTEGER DEFAULT 0,
-        escalated_interactions INTEGER DEFAULT 0,
-        avg_duration_seconds DECIMAL(10,2),
-        avg_bot_duration_seconds DECIMAL(10,2),
-        avg_human_duration_seconds DECIMAL(10,2),
-        avg_queue_time_seconds DECIMAL(10,2),
-        success_rate DECIMAL(5,4),
-        first_contact_resolution_rate DECIMAL(5,4),
-        escalation_rate DECIMAL(5,4),
-        avg_customer_satisfaction DECIMAL(3,2),
-        avg_customer_effort_score DECIMAL(3,2),
-        avg_nps_score DECIMAL(4,2),
-        total_cost DECIMAL(10,2),
-        cost_per_interaction DECIMAL(8,4),
-        total_revenue_impact DECIMAL(12,2),
-        total_duration_seconds BIGINT DEFAULT 0,
-        peak_hour INTEGER,
-        unique_customers INTEGER DEFAULT 0,
-        repeat_customers INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(metric_date, channel_id)
-    )
-    </table_schema>
-    <data_dictionary>
-    success_rate: Percentage of successful interactions
-    escalation_rate: Percentage of interactions escalated to humans
-    first_contact_resolution_rate: Percentage resolved on first contact
-    avg_customer_satisfaction: Average CSAT score for the day
-    cost_per_interaction: Average cost per interaction
-    peak_hour: Hour of day with most activity (0-23)
-    unique_customers: Number of unique customers served
-    </data_dictionary>
-    </table>
-
-    <table>
-    <table_name>customer_feedback</table_name>
-    <table_description>Customer feedback collection across all touchpoints with structured and unstructured data</table_description>
-    <table_schema>
-    customer_feedback (
-        feedback_id UUID PRIMARY KEY,
-        customer_id UUID NOT NULL REFERENCES customers(customer_id),
-        interaction_id UUID REFERENCES customer_interactions(interaction_id),
-        session_id UUID REFERENCES customer_journey_sessions(session_id),
-        template_id UUID REFERENCES survey_templates(template_id),
-        feedback_type VARCHAR(30) CHECK (feedback_type IN ('csat', 'nps', 'ces', 'complaint', 'compliment', 'suggestion')),
-        feedback_channel VARCHAR(30),
-        feedback_timestamp TIMESTAMP NOT NULL,
-        satisfaction_score INTEGER CHECK (satisfaction_score BETWEEN 1 AND 5),
-        effort_score INTEGER CHECK (effort_score BETWEEN 1 AND 7),
-        nps_score INTEGER CHECK (nps_score BETWEEN 0 AND 10),
-        feedback_text TEXT,
-        sentiment_score DECIMAL(3,2),
-        sentiment_confidence DECIMAL(3,2),
-        response_required BOOLEAN DEFAULT false,
-        response_provided BOOLEAN DEFAULT false,
-        response_timestamp TIMESTAMP,
-        resolution_status VARCHAR(20),
-        feedback_metadata JSONB,
+        agent_id SERIAL PRIMARY KEY,
+        agent_name VARCHAR(100) NOT NULL,
+        employee_id VARCHAR(20) UNIQUE,
+        department VARCHAR(50),
+        skill_level VARCHAR(20) CHECK (skill_level IN ('Junior', 'Senior', 'Expert')) DEFAULT 'Junior',
+        is_active BOOLEAN DEFAULT TRUE,
+        hire_date DATE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     </table_schema>
     <data_dictionary>
-    feedback_type: Type of feedback (csat, nps, ces, complaint, compliment, suggestion)
-    satisfaction_score: CSAT rating (1-5)
-    effort_score: CES rating (1-7)
-    nps_score: NPS rating (0-10)
-    sentiment_score: Automated sentiment analysis (-1.00 to 1.00)
-    response_required: Whether feedback requires follow-up
+    agent_id: Unique identifier for each agent
+    agent_name: Full name of the agent
+    employee_id: Company employee identifier
+    department: Department (Customer Service, Technical Support, Billing, Sales)
+    skill_level: Experience level (Junior, Senior, Expert)
+    is_active: Whether agent is currently active
+    hire_date: Date when agent was hired
+    </data_dictionary>
+    </table>
+
+    <table>
+    <table_name>interaction_types</table_name>
+    <table_description>Types of customer interactions catalog (Support, Sales, Billing, etc.)</table_description>
+    <table_schema>
+    interaction_types (
+        interaction_type_id SERIAL PRIMARY KEY,
+        interaction_code VARCHAR(20) NOT NULL UNIQUE,
+        interaction_name VARCHAR(100) NOT NULL,
+        category VARCHAR(50),
+        priority_level VARCHAR(20) CHECK (priority_level IN ('Low', 'Medium', 'High', 'Critical')) DEFAULT 'Medium',
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    </table_schema>
+    <data_dictionary>
+    interaction_type_id: Unique identifier for each interaction type
+    interaction_code: Short code for the interaction (BILLING, TECH_SUPPORT, PLAN_CHANGE, etc.)
+    interaction_name: Full descriptive name
+    category: Main category (Billing, Technical, Account, Support, Sales)
+    priority_level: Business priority (Low, Medium, High, Critical)
+    is_active: Whether interaction type is currently active
     </data_dictionary>
     </table>
 
     <table>
     <table_name>service_plans</table_name>
-    <table_description>Customer service plan catalog with pricing and features</table_description>
+    <table_description>Available service plans and packages catalog</table_description>
     <table_schema>
     service_plans (
-        plan_id UUID PRIMARY KEY,
-        plan_code VARCHAR(50) UNIQUE NOT NULL,
-        plan_name VARCHAR(100) NOT NULL,
-        plan_type VARCHAR(20) CHECK (plan_type IN ('data', 'voice', 'combo', 'addon')),
-        plan_category VARCHAR(20) CHECK (plan_category IN ('prepaid', 'postpaid', 'hybrid')),
-        monthly_fee DECIMAL(8,2),
+        service_plan_id SERIAL PRIMARY KEY,
+        plan_name VARCHAR(100) NOT NULL UNIQUE,
+        plan_type VARCHAR(50),
+        monthly_fee DECIMAL(10,2),
         data_allowance_gb INTEGER,
         voice_minutes INTEGER,
         sms_allowance INTEGER,
-        validity_days INTEGER,
-        is_active BOOLEAN DEFAULT true,
+        is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     </table_schema>
     <data_dictionary>
-    plan_type: Type of plan (data, voice, combo, addon)
-    plan_category: Billing category (prepaid, postpaid, hybrid)
-    data_allowance_gb: Data allowance in GB (-1 for unlimited)
-    voice_minutes: Voice minutes included (-1 for unlimited)
-    validity_days: Plan validity period in days
+    service_plan_id: Unique identifier for each service plan
+    plan_name: Name of the service plan
+    plan_type: Type of plan (Prepaid, Postpaid, Business)
+    monthly_fee: Monthly cost of the plan
+    data_allowance_gb: Data allowance in GB
+    voice_minutes: Voice minutes included
+    sms_allowance: SMS messages included
+    is_active: Whether plan is currently available
     </data_dictionary>
     </table>
 
     <table>
-    <table_name>knowledge_base</table_name>
-    <table_description>Knowledge base articles for bot and agent support with usage tracking</table_description>
+    <table_name>customer_service_plans</table_name>
+    <table_description>Customer to service plan relationships and history</table_description>
     <table_schema>
-    knowledge_base (
-        kb_id UUID PRIMARY KEY,
-        kb_code VARCHAR(50) UNIQUE NOT NULL,
-        title VARCHAR(255) NOT NULL,
-        content TEXT NOT NULL,
-        category VARCHAR(50),
-        tags VARCHAR(100)[],
-        language VARCHAR(5) DEFAULT 'es',
-        confidence_score DECIMAL(3,2),
-        usage_count INTEGER DEFAULT 0,
-        success_rate DECIMAL(5,4),
-        is_active BOOLEAN DEFAULT true,
+    customer_service_plans (
+        customer_service_plan_id SERIAL PRIMARY KEY,
+        customer_id INTEGER NOT NULL REFERENCES customers(customer_id) ON DELETE CASCADE,
+        service_plan_id INTEGER NOT NULL REFERENCES service_plans(service_plan_id),
+        start_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        end_date DATE,
+        is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        UNIQUE(customer_id, service_plan_id, start_date)
     )
     </table_schema>
     <data_dictionary>
-    confidence_score: Confidence in article accuracy (0.00 to 1.00)
-    usage_count: Number of times article was used
-    success_rate: Rate of successful issue resolution using this article
-    tags: Array of searchable tags
+    customer_service_plan_id: Unique identifier for each customer-plan relationship
+    customer_id: Reference to customer
+    service_plan_id: Reference to service plan
+    start_date: When customer started using this plan
+    end_date: When customer stopped using this plan (NULL if current)
+    is_active: Whether this plan assignment is currently active
+    </data_dictionary>
+    </table>
+
+    <table>
+    <table_name>customer_interactions</table_name>
+    <table_description>Main fact table storing all customer interactions across all channels</table_description>
+    <table_schema>
+    customer_interactions (
+        interaction_id SERIAL PRIMARY KEY,
+        customer_id INTEGER NOT NULL REFERENCES customers(customer_id),
+        channel_id INTEGER NOT NULL REFERENCES channels(channel_id),
+        interaction_type_id INTEGER NOT NULL REFERENCES interaction_types(interaction_type_id),
+        agent_id INTEGER REFERENCES agents(agent_id),
+        session_id VARCHAR(50),
+        start_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        end_timestamp TIMESTAMP,
+        duration_seconds INTEGER,
+        queue_time_seconds INTEGER DEFAULT 0,
+        resolution_status VARCHAR(20) CHECK (resolution_status IN ('Resolved', 'Pending', 'Escalated', 'Cancelled')) DEFAULT 'Pending',
+        satisfaction_score DECIMAL(3,2) CHECK (satisfaction_score BETWEEN -1.0 AND 1.0),
+        interaction_summary TEXT,
+        language VARCHAR(5) DEFAULT 'es',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    </table_schema>
+    <data_dictionary>
+    interaction_id: Unique identifier for each interaction
+    customer_id: Reference to customer who initiated interaction
+    channel_id: Reference to channel used for interaction
+    interaction_type_id: Reference to type of interaction
+    agent_id: Reference to agent who handled interaction (NULL for self-service)
+    session_id: Session identifier for grouping related interactions
+    start_timestamp: When interaction started
+    end_timestamp: When interaction ended (NULL for ongoing)
+    duration_seconds: Total duration of interaction in seconds
+    queue_time_seconds: Time customer waited before being served
+    resolution_status: Current status (Resolved, Pending, Escalated, Cancelled)
+    satisfaction_score: Customer satisfaction score (-1.0 to 1.0, where -1 is very dissatisfied, 1 is very satisfied)
+    interaction_summary: Brief summary of the interaction
+    language: Language used during interaction
     </data_dictionary>
     </table>
 </tables>

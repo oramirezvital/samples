@@ -5,123 +5,178 @@ import { executeDirectQuery, kpiQueries, parseQueryResult } from '../utils/Datab
 
 const KPIDashboard = () => {
   const [kpiData, setKpiData] = useState({
-    dailyUsage: { loading: true, data: null, value: '0 TB' },
-    simInventory: { loading: true, data: null, value: '0' },
-    lineSubscriptions: { loading: true, data: null, value: '0' },
-    devices: { loading: true, data: null, value: '0' },
-    usageTotals: { loading: true, data: null, value: '0' }
+    totalInteractions: { loading: true, data: null, value: '0' },
+    avgSatisfaction: { loading: true, data: null, value: '0.0' },
+    channelPerformance: { loading: true, data: null, value: '0' },
+    agentProductivity: { loading: true, data: null, value: '0' },
+    resolutionRate: { loading: true, data: null, value: '0%' }
   });
 
   const [refreshInterval, setRefreshInterval] = useState(null);
 
+  // Customer Care KPI Queries
+  const customerCareQueries = {
+    totalInteractions: `
+      SELECT COUNT(*) as total_interactions,
+             DATE(start_timestamp) as interaction_date
+      FROM customer_interactions 
+      WHERE start_timestamp >= CURRENT_DATE - INTERVAL '7 days'
+      GROUP BY DATE(start_timestamp)
+      ORDER BY interaction_date DESC
+      LIMIT 7
+    `,
+    avgSatisfaction: `
+      SELECT AVG(satisfaction_score) as avg_satisfaction,
+             DATE(start_timestamp) as interaction_date
+      FROM customer_interactions 
+      WHERE satisfaction_score IS NOT NULL 
+        AND start_timestamp >= CURRENT_DATE - INTERVAL '7 days'
+      GROUP BY DATE(start_timestamp)
+      ORDER BY interaction_date DESC
+      LIMIT 7
+    `,
+    channelPerformance: `
+      SELECT c.channel_name,
+             COUNT(*) as interaction_count,
+             AVG(ci.satisfaction_score) as avg_satisfaction
+      FROM customer_interactions ci
+      JOIN channels c ON ci.channel_id = c.channel_id
+      WHERE ci.start_timestamp >= CURRENT_DATE - INTERVAL '30 days'
+      GROUP BY c.channel_id, c.channel_name
+      ORDER BY interaction_count DESC
+      LIMIT 8
+    `,
+    agentProductivity: `
+      SELECT a.agent_name,
+             COUNT(*) as interactions_handled,
+             AVG(ci.satisfaction_score) as avg_satisfaction,
+             AVG(ci.duration_seconds) as avg_duration
+      FROM customer_interactions ci
+      JOIN agents a ON ci.agent_id = a.agent_id
+      WHERE ci.start_timestamp >= CURRENT_DATE - INTERVAL '30 days'
+        AND ci.agent_id IS NOT NULL
+      GROUP BY a.agent_id, a.agent_name
+      ORDER BY interactions_handled DESC
+      LIMIT 10
+    `,
+    resolutionRate: `
+      SELECT resolution_status,
+             COUNT(*) as count,
+             DATE(start_timestamp) as interaction_date
+      FROM customer_interactions
+      WHERE start_timestamp >= CURRENT_DATE - INTERVAL '7 days'
+      GROUP BY resolution_status, DATE(start_timestamp)
+      ORDER BY interaction_date DESC
+    `,
+    todayStats: `
+      SELECT COUNT(*) as today_interactions,
+             AVG(satisfaction_score) as today_satisfaction,
+             COUNT(CASE WHEN resolution_status = 'Resolved' THEN 1 END) * 100.0 / COUNT(*) as today_resolution_rate
+      FROM customer_interactions
+      WHERE DATE(start_timestamp) = CURRENT_DATE
+    `
+  };
+
   // Function to fetch real data from database
   const fetchRealData = async () => {
     try {
-      console.log('Fetching real KPI data from database...');
+      console.log('Fetching customer care KPI data from database...');
 
       // Execute all queries in parallel
       const [
-        dailyUsageResult,
-        simInventoryResult,
-        lineSubscriptionsResult,
-        devicesResult,
-        totalDevicesResult,
-        todayUsageResult,
-        usageTotalsResult,
-        usageTotalsDailyResult
+        totalInteractionsResult,
+        avgSatisfactionResult,
+        channelPerformanceResult,
+        agentProductivityResult,
+        resolutionRateResult,
+        todayStatsResult
       ] = await Promise.all([
-        executeDirectQuery(kpiQueries.dailyUsage, 'Daily usage trend'),
-        executeDirectQuery(kpiQueries.simInventory, 'SIM inventory status'),
-        executeDirectQuery(kpiQueries.lineSubscriptions, 'Total active lines'),
-        executeDirectQuery(kpiQueries.devices, 'Device types'),
-        executeDirectQuery(kpiQueries.totalDevices, 'Total devices'),
-        executeDirectQuery(kpiQueries.todayUsage, 'Today usage'),
-        executeDirectQuery(kpiQueries.usageTotals, 'Usage totals'),
-        executeDirectQuery(kpiQueries.usageTotalsDaily, 'Daily usage totals')
+        executeDirectQuery(customerCareQueries.totalInteractions, 'Total interactions trend'),
+        executeDirectQuery(customerCareQueries.avgSatisfaction, 'Average satisfaction trend'),
+        executeDirectQuery(customerCareQueries.channelPerformance, 'Channel performance'),
+        executeDirectQuery(customerCareQueries.agentProductivity, 'Agent productivity'),
+        executeDirectQuery(customerCareQueries.resolutionRate, 'Resolution rate trend'),
+        executeDirectQuery(customerCareQueries.todayStats, 'Today statistics')
       ]);
 
       // Parse results
-      const dailyUsageData = parseQueryResult(dailyUsageResult, 'dailyUsage');
-      const simInventoryData = parseQueryResult(simInventoryResult, 'simInventory');
-      const lineSubscriptionsData = parseQueryResult(lineSubscriptionsResult, 'lineSubscriptions');
-      const devicesData = parseQueryResult(devicesResult, 'devices');
-      const totalDevicesData = parseQueryResult(totalDevicesResult, 'totalDevices');
-      const todayUsageData = parseQueryResult(todayUsageResult, 'todayUsage');
-      const usageTotalsData = parseQueryResult(usageTotalsResult, 'usageTotals');
-      const usageTotalsDailyData = parseQueryResult(usageTotalsDailyResult, 'usageTotalsDaily');
+      const totalInteractionsData = parseQueryResult(totalInteractionsResult, 'totalInteractions');
+      const avgSatisfactionData = parseQueryResult(avgSatisfactionResult, 'avgSatisfaction');
+      const channelPerformanceData = parseQueryResult(channelPerformanceResult, 'channelPerformance');
+      const agentProductivityData = parseQueryResult(agentProductivityResult, 'agentProductivity');
+      const resolutionRateData = parseQueryResult(resolutionRateResult, 'resolutionRate');
+      const todayStatsData = parseQueryResult(todayStatsResult, 'todayStats');
 
       // Process and update state with real data
-      updateKPIData(dailyUsageData, simInventoryData, lineSubscriptionsData, devicesData, totalDevicesData, todayUsageData, usageTotalsData, usageTotalsDailyData);
+      updateKPIData(totalInteractionsData, avgSatisfactionData, channelPerformanceData, agentProductivityData, resolutionRateData, todayStatsData);
 
     } catch (error) {
-      console.error('Error fetching real data:', error);
+      console.error('Error fetching customer care data:', error);
       // Fallback to mock data if real data fails
       setMockData();
     }
   };
 
-  const updateKPIData = (dailyUsageData, simInventoryData, lineSubscriptionsData, devicesData, totalDevicesData, todayUsageData, usageTotalsData, usageTotalsDailyData) => {
-    // Process daily usage data
-    const usageValues = dailyUsageData.map(item => item.total_gb);
-    const usageDates = dailyUsageData.map(item => {
-      const date = new Date(item.date);
+  const updateKPIData = (totalInteractionsData, avgSatisfactionData, channelPerformanceData, agentProductivityData, resolutionRateData, todayStatsData) => {
+    // Process total interactions data
+    const interactionValues = totalInteractionsData.map(item => parseInt(item.total_interactions));
+    const interactionDates = totalInteractionsData.map(item => {
+      const date = new Date(item.interaction_date);
       return date.toLocaleDateString('en-US', { weekday: 'short' });
     });
-    const todayUsage = todayUsageData[0]?.total_tb || 0;
+    const todayInteractions = todayStatsData[0]?.today_interactions || 0;
 
-    // Process SIM inventory data
-    const simValues = simInventoryData.map(item => item.count);
-    const simLabels = simInventoryData.map(item => {
-      switch(item.sim_status) {
-        case 'ACTIVE': return 'Active';
-        case 'INVENTORY': return 'Inventory';
-        case 'SUSPENDED': return 'Suspended';
-        default: return item.sim_status;
-      }
-    });
-    const totalSims = simValues.reduce((sum, val) => sum + val, 0);
-
-    // Process line subscriptions data
-    const totalActiveLines = lineSubscriptionsData[0]?.total_active_lines || 0;
-
-    // Process devices data
-    const deviceValues = devicesData.map(item => item.count);
-    const deviceLabels = devicesData.map(item => {
-      switch(item.device_type) {
-        case 'SMARTPHONE': return 'Smartphones';
-        case 'TABLET': return 'Tablets';
-        case 'IOT_DEVICE': return 'IoT Devices';
-        case 'HOTSPOT': return 'Hotspots';
-        default: return 'Others';
-      }
-    });
-    const totalDevices = totalDevicesData[0]?.total_devices || 0;
-
-    // Process usage totals data
-    const usageTotals = usageTotalsData[0] || { total_data_gb: 0, total_voice_minutes: 0, total_sms_count: 0 };
-    const totalDataGB = usageTotals.total_data_gb || 0;
-    const totalVoiceMinutes = usageTotals.total_voice_minutes || 0;
-    const totalSMSCount = usageTotals.total_sms_count || 0;
-
-    // Process daily usage totals for chart
-    const dailyDataValues = usageTotalsDailyData.map(item => item.daily_data_gb);
-    const dailyVoiceValues = usageTotalsDailyData.map(item => Math.round(item.daily_voice_minutes / 1000)); // Convert to thousands
-    const dailySMSValues = usageTotalsDailyData.map(item => Math.round(item.daily_sms_count / 100)); // Convert to hundreds
-    const dailyDates = usageTotalsDailyData.map(item => {
-      const date = new Date(item.date);
+    // Process satisfaction data
+    const satisfactionValues = avgSatisfactionData.map(item => parseFloat(item.avg_satisfaction).toFixed(2));
+    const satisfactionDates = avgSatisfactionData.map(item => {
+      const date = new Date(item.interaction_date);
       return date.toLocaleDateString('en-US', { weekday: 'short' });
     });
+    const todaySatisfaction = todayStatsData[0]?.today_satisfaction || 0;
+
+    // Process channel performance data
+    const channelValues = channelPerformanceData.map(item => parseInt(item.interaction_count));
+    const channelLabels = channelPerformanceData.map(item => item.channel_name);
+    const topChannel = channelPerformanceData[0]?.channel_name || 'N/A';
+
+    // Process agent productivity data
+    const agentValues = agentProductivityData.map(item => parseInt(item.interactions_handled));
+    const agentLabels = agentProductivityData.map(item => item.agent_name);
+    const totalAgentInteractions = agentValues.reduce((sum, val) => sum + val, 0);
+
+    // Process resolution rate data
+    const resolutionData = {};
+    resolutionRateData.forEach(item => {
+      const date = item.interaction_date;
+      if (!resolutionData[date]) {
+        resolutionData[date] = { total: 0, resolved: 0 };
+      }
+      resolutionData[date].total += parseInt(item.count);
+      if (item.resolution_status === 'Resolved') {
+        resolutionData[date].resolved += parseInt(item.count);
+      }
+    });
+
+    const resolutionRates = Object.keys(resolutionData).map(date => {
+      const rate = (resolutionData[date].resolved / resolutionData[date].total) * 100;
+      return parseFloat(rate.toFixed(1));
+    });
+    const resolutionDates = Object.keys(resolutionData).map(date => {
+      const dateObj = new Date(date);
+      return dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+    });
+    const todayResolutionRate = todayStatsData[0]?.today_resolution_rate || 0;
 
     // Update state with processed data
     setKpiData({
-      dailyUsage: {
+      totalInteractions: {
         loading: false,
-        value: `${todayUsage} TB`,
+        value: todayInteractions.toLocaleString(),
         data: {
           series: [
             {
-              name: 'Data Usage (GB)',
-              data: usageValues.reverse() // Reverse to show chronological order
+              name: 'Daily Interactions',
+              data: interactionValues.reverse()
             }
           ],
           options: {
@@ -137,62 +192,25 @@ const KPIDashboard = () => {
               width: 3
             },
             xaxis: {
-              categories: usageDates.reverse()
+              categories: interactionDates.reverse()
             },
             colors: ['#E30613'],
             tooltip: {
               y: {
-                formatter: (val) => `${val} GB`
+                formatter: (val) => `${val} interactions`
               }
             }
           }
         }
       },
-      simInventory: {
+      avgSatisfaction: {
         loading: false,
-        value: totalSims.toLocaleString(),
-        data: {
-          series: simValues,
-          options: {
-            chart: {
-              type: 'donut',
-              height: 180
-            },
-            labels: simLabels,
-            colors: ['#E30613', '#666666', '#CCCCCC'],
-            legend: { show: false },
-            dataLabels: { enabled: false },
-            plotOptions: {
-              pie: {
-                donut: {
-                  size: '70%',
-                  labels: {
-                    show: true,
-                    total: {
-                      show: true,
-                      label: 'Total SIMs',
-                      formatter: () => totalSims.toLocaleString()
-                    }
-                  }
-                }
-              }
-            },
-            tooltip: {
-              y: {
-                formatter: (val) => val.toLocaleString()
-              }
-            }
-          }
-        }
-      },
-      lineSubscriptions: {
-        loading: false,
-        value: totalActiveLines.toLocaleString(),
+        value: parseFloat(todaySatisfaction).toFixed(2),
         data: {
           series: [
             {
-              name: 'Active Lines',
-              data: [12800, 12950, 13005, 13100, 13200, 13150, totalActiveLines] // Mock trend data
+              name: 'Satisfaction Score',
+              data: satisfactionValues.reverse()
             }
           ],
           options: {
@@ -218,24 +236,65 @@ const KPIDashboard = () => {
             },
             colors: ['#E30613'],
             xaxis: {
-              categories: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6', 'Current']
+              categories: satisfactionDates.reverse()
+            },
+            yaxis: {
+              min: -1,
+              max: 1
             },
             tooltip: {
               y: {
-                formatter: (val) => val.toLocaleString()
+                formatter: (val) => `${val} score`
               }
             }
           }
         }
       },
-      devices: {
+      channelPerformance: {
         loading: false,
-        value: totalDevices.toLocaleString(),
+        value: topChannel,
+        data: {
+          series: channelValues,
+          options: {
+            chart: {
+              type: 'donut',
+              height: 180
+            },
+            labels: channelLabels,
+            colors: ['#E30613', '#FF4444', '#FF6666', '#FF8888', '#FFAAAA', '#CCCCCC', '#DDDDDD', '#EEEEEE'],
+            legend: { show: false },
+            dataLabels: { enabled: false },
+            plotOptions: {
+              pie: {
+                donut: {
+                  size: '70%',
+                  labels: {
+                    show: true,
+                    total: {
+                      show: true,
+                      label: 'Total',
+                      formatter: () => channelValues.reduce((sum, val) => sum + val, 0).toLocaleString()
+                    }
+                  }
+                }
+              }
+            },
+            tooltip: {
+              y: {
+                formatter: (val) => `${val.toLocaleString()} interactions`
+              }
+            }
+          }
+        }
+      },
+      agentProductivity: {
+        loading: false,
+        value: totalAgentInteractions.toLocaleString(),
         data: {
           series: [
             {
-              name: 'Devices',
-              data: deviceValues
+              name: 'Interactions Handled',
+              data: agentValues.slice(0, 8) // Show top 8 agents
             }
           ],
           options: {
@@ -252,33 +311,25 @@ const KPIDashboard = () => {
             },
             colors: ['#E30613'],
             xaxis: {
-              categories: deviceLabels
+              categories: agentLabels.slice(0, 8)
             },
             dataLabels: { enabled: false },
             tooltip: {
               y: {
-                formatter: (val) => val.toLocaleString()
+                formatter: (val) => `${val.toLocaleString()} interactions`
               }
             }
           }
         }
       },
-      usageTotals: {
+      resolutionRate: {
         loading: false,
-        value: `${totalDataGB.toLocaleString()} GB`,
+        value: `${parseFloat(todayResolutionRate).toFixed(1)}%`,
         data: {
           series: [
             {
-              name: 'Data (GB)',
-              data: dailyDataValues.reverse()
-            },
-            {
-              name: 'Voice (K min)',
-              data: dailyVoiceValues.reverse()
-            },
-            {
-              name: 'SMS (100s)',
-              data: dailySMSValues.reverse()
+              name: 'Resolution Rate (%)',
+              data: resolutionRates.reverse()
             }
           ],
           options: {
@@ -290,47 +341,41 @@ const KPIDashboard = () => {
             },
             stroke: {
               curve: 'smooth',
-              colors: ['#E30613', '#666666', '#CCCCCC'],
-              width: 2
+              colors: ['#E30613'],
+              width: 3
             },
             xaxis: {
-              categories: dailyDates.reverse()
+              categories: resolutionDates.reverse()
             },
-            colors: ['#E30613', '#666666', '#CCCCCC'],
+            colors: ['#E30613'],
+            yaxis: {
+              min: 0,
+              max: 100
+            },
             tooltip: {
-              y: [
-                {
-                  formatter: (val) => `${val} GB`
-                },
-                {
-                  formatter: (val) => `${val}K minutes`
-                },
-                {
-                  formatter: (val) => `${val * 100} SMS`
-                }
-              ]
-            },
-            legend: {
-              show: false
+              y: {
+                formatter: (val) => `${val}%`
+              }
             }
           }
         }
       }
     });
 
-    console.log('KPI data updated with real database values including usage totals');
+    console.log('Customer care KPI data updated with real database values');
   };
+
   const setMockData = () => {
-    console.log('Using mock data for KPIs');
+    console.log('Using mock data for customer care KPIs');
     setKpiData({
-      dailyUsage: {
+      totalInteractions: {
         loading: false,
-        value: '68.2 TB',
+        value: '1,247',
         data: {
           series: [
             {
-              name: 'Data Usage (GB)',
-              data: [45, 52, 38, 65, 49, 75, 68]
+              name: 'Daily Interactions',
+              data: [1150, 1200, 1180, 1300, 1250, 1220, 1247]
             }
           ],
           options: {
@@ -352,46 +397,14 @@ const KPIDashboard = () => {
           }
         }
       },
-      simInventory: {
+      avgSatisfaction: {
         loading: false,
-        value: '10,000',
-        data: {
-          series: [8450, 1200, 350],
-          options: {
-            chart: {
-              type: 'donut',
-              height: 180
-            },
-            labels: ['Active', 'Inventory', 'Suspended'],
-            colors: ['#E30613', '#666666', '#CCCCCC'],
-            legend: { show: false },
-            dataLabels: { enabled: false },
-            plotOptions: {
-              pie: {
-                donut: {
-                  size: '70%',
-                  labels: {
-                    show: true,
-                    total: {
-                      show: true,
-                      label: 'Total SIMs',
-                      formatter: () => '10,000'
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      lineSubscriptions: {
-        loading: false,
-        value: '13,005',
+        value: '0.72',
         data: {
           series: [
             {
-              name: 'Active Lines',
-              data: [12800, 12950, 13005, 13100, 13200, 13150, 13005]
+              name: 'Satisfaction Score',
+              data: [0.68, 0.71, 0.69, 0.74, 0.73, 0.70, 0.72]
             }
           ],
           options: {
@@ -417,19 +430,55 @@ const KPIDashboard = () => {
             },
             colors: ['#E30613'],
             xaxis: {
-              categories: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6', 'Week 7']
+              categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+            },
+            yaxis: {
+              min: -1,
+              max: 1
             }
           }
         }
       },
-      devices: {
+      channelPerformance: {
         loading: false,
-        value: '11,500',
+        value: 'Phone',
+        data: {
+          series: [450, 320, 280, 150, 120, 80, 60, 40],
+          options: {
+            chart: {
+              type: 'donut',
+              height: 180
+            },
+            labels: ['Phone', 'Web Chat', 'Email', 'Mobile App', 'WhatsApp', 'In-Store', 'Social Media', 'SMS'],
+            colors: ['#E30613', '#FF4444', '#FF6666', '#FF8888', '#FFAAAA', '#CCCCCC', '#DDDDDD', '#EEEEEE'],
+            legend: { show: false },
+            dataLabels: { enabled: false },
+            plotOptions: {
+              pie: {
+                donut: {
+                  size: '70%',
+                  labels: {
+                    show: true,
+                    total: {
+                      show: true,
+                      label: 'Total',
+                      formatter: () => '1,500'
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      agentProductivity: {
+        loading: false,
+        value: '8,450',
         data: {
           series: [
             {
-              name: 'Devices',
-              data: [5200, 3800, 1500, 800, 200]
+              name: 'Interactions Handled',
+              data: [145, 132, 128, 115, 108, 95, 87, 82]
             }
           ],
           options: {
@@ -446,28 +495,20 @@ const KPIDashboard = () => {
             },
             colors: ['#E30613'],
             xaxis: {
-              categories: ['Smartphones', 'Tablets', 'IoT Devices', 'Hotspots', 'Others']
+              categories: ['María G.', 'Carlos R.', 'Ana M.', 'Luis H.', 'Carmen L.', 'Roberto S.', 'Patricia M.', 'Diego V.']
             },
             dataLabels: { enabled: false }
           }
         }
       },
-      usageTotals: {
+      resolutionRate: {
         loading: false,
-        value: '2,048 GB',
+        value: '78.5%',
         data: {
           series: [
             {
-              name: 'Data (GB)',
-              data: [45, 52, 38, 65, 49, 75, 68]
-            },
-            {
-              name: 'Voice (K min)',
-              data: [3.6, 4.5, 3.2, 4.1, 3.8, 3.9, 4.2]
-            },
-            {
-              name: 'SMS (100s)',
-              data: [15, 21, 14, 19, 16, 17, 18]
+              name: 'Resolution Rate (%)',
+              data: [75.2, 77.8, 76.5, 79.1, 78.9, 77.3, 78.5]
             }
           ],
           options: {
@@ -479,15 +520,16 @@ const KPIDashboard = () => {
             },
             stroke: {
               curve: 'smooth',
-              colors: ['#E30613', '#666666', '#CCCCCC'],
-              width: 2
+              colors: ['#E30613'],
+              width: 3
             },
             xaxis: {
               categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
             },
-            colors: ['#E30613', '#666666', '#CCCCCC'],
-            legend: {
-              show: false
+            colors: ['#E30613'],
+            yaxis: {
+              min: 0,
+              max: 100
             }
           }
         }
@@ -501,7 +543,7 @@ const KPIDashboard = () => {
 
     // Set up auto-refresh every 5 minutes
     const interval = setInterval(() => {
-      console.log('Auto-refreshing KPI data...');
+      console.log('Auto-refreshing customer care KPI data...');
       fetchRealData();
     }, 5 * 60 * 1000); // 5 minutes
 
@@ -566,47 +608,47 @@ const KPIDashboard = () => {
       <Grid container spacing={3}>
         <Grid item xs={12} sm={6} md={2.4}>
           <KPICard
-            title="Daily Usage"
-            value={kpiData.dailyUsage.value}
-            subtitle="Total data consumed today"
-            chart={kpiData.dailyUsage.data}
-            loading={kpiData.dailyUsage.loading}
+            title="Total Interactions"
+            value={kpiData.totalInteractions.value}
+            subtitle="Customer interactions today"
+            chart={kpiData.totalInteractions.data}
+            loading={kpiData.totalInteractions.loading}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={2.4}>
           <KPICard
-            title="SIM Inventory"
-            value={kpiData.simInventory.value}
-            subtitle="Active, inventory & suspended"
-            chart={kpiData.simInventory.data}
-            loading={kpiData.simInventory.loading}
+            title="Avg Satisfaction"
+            value={kpiData.avgSatisfaction.value}
+            subtitle="Customer satisfaction score (-1 to 1)"
+            chart={kpiData.avgSatisfaction.data}
+            loading={kpiData.avgSatisfaction.loading}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={2.4}>
           <KPICard
-            title="Line Subscriptions"
-            value={kpiData.lineSubscriptions.value}
-            subtitle="Active lines currently"
-            chart={kpiData.lineSubscriptions.data}
-            loading={kpiData.lineSubscriptions.loading}
+            title="Top Channel"
+            value={kpiData.channelPerformance.value}
+            subtitle="Channel performance (30 days)"
+            chart={kpiData.channelPerformance.data}
+            loading={kpiData.channelPerformance.loading}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={2.4}>
           <KPICard
-            title="Devices"
-            value={kpiData.devices.value}
-            subtitle="Total managed devices"
-            chart={kpiData.devices.data}
-            loading={kpiData.devices.loading}
+            title="Agent Interactions"
+            value={kpiData.agentProductivity.value}
+            subtitle="Total agent-handled interactions"
+            chart={kpiData.agentProductivity.data}
+            loading={kpiData.agentProductivity.loading}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={2.4}>
           <KPICard
-            title="Usage Totals"
-            value={kpiData.usageTotals.value}
-            subtitle="Data, voice & SMS (30 days)"
-            chart={kpiData.usageTotals.data}
-            loading={kpiData.usageTotals.loading}
+            title="Resolution Rate"
+            value={kpiData.resolutionRate.value}
+            subtitle="Issues resolved today"
+            chart={kpiData.resolutionRate.data}
+            loading={kpiData.resolutionRate.loading}
           />
         </Grid>
       </Grid>

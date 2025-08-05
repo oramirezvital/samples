@@ -127,7 +127,7 @@ class SimplifiedSyntheticDataGenerator:
         # Ensure score stays within bounds
         return max(-1.0, min(1.0, round(score, 2)))
     
-    def generate_interaction(self, interaction_id: int, base_date: datetime) -> str:
+    def generate_interaction(self, base_date: datetime) -> str:
         """Generate a single customer interaction"""
         customer_id = random.choice(self.customer_ids)
         channel_id = self.weighted_choice(self.channel_ids, self.channel_weights)
@@ -150,17 +150,17 @@ class SimplifiedSyntheticDataGenerator:
         resolution_status = random.choices(self.resolution_statuses, weights=self.resolution_weights)[0]
         satisfaction_score = self.generate_satisfaction_score(resolution_status, duration)
         
-        # Generate SQL INSERT statement
+        # Generate SQL INSERT statement (let PostgreSQL auto-generate interaction_id)
         agent_value = f"{agent_id}" if agent_id else "NULL"
         end_timestamp_value = f"'{end_timestamp}'" if end_timestamp else "NULL"
         duration_value = duration if duration > 0 else "NULL"
         
         sql = f"""INSERT INTO customer_interactions (
-                    interaction_id, customer_id, channel_id, interaction_type_id, agent_id,
+                    customer_id, channel_id, interaction_type_id, agent_id,
                     session_id, start_timestamp, end_timestamp, duration_seconds, queue_time_seconds,
                     resolution_status, satisfaction_score, language
                 ) VALUES (
-                    {interaction_id}, {customer_id}, {channel_id}, {interaction_type_id}, {agent_value},
+                    {customer_id}, {channel_id}, {interaction_type_id}, {agent_value},
                     '{session_id}', '{start_timestamp}', {end_timestamp_value}, {duration_value}, {queue_time},
                     '{resolution_status}', {satisfaction_score}, 'es'
                 );"""
@@ -182,7 +182,7 @@ class SimplifiedSyntheticDataGenerator:
         ]
         
         for i in range(1, num_interactions + 1):
-            sql_statements.append(self.generate_interaction(i, base_date))
+            sql_statements.append(self.generate_interaction(base_date))
             
             if i % 1000 == 0:
                 print(f"Generated {i} interactions...", file=sys.stderr)
