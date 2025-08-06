@@ -181,3 +181,4 @@ cython_debug/
 .cursorindexingignore
 04-UX-demos/02-video-games-sales-assistant/model/simplified_synthetic_data*
 04-UX-demos/02-video-games-sales-assistant/model/.env.example
+04-UX-demos/02-video-games-sales-assistant/model/db_config.py
