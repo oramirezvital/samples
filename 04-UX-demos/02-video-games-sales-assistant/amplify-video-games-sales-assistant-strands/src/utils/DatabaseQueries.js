@@ -44,7 +44,7 @@ export const kpiQueries = {
   totalInteractions: `
     SELECT COUNT(*) as total_interactions,
            DATE(start_timestamp) as interaction_date
-    FROM customer_interactions 
+    FROM subscriber_interactions 
     WHERE start_timestamp >= CURRENT_DATE - INTERVAL '7 days'
     GROUP BY DATE(start_timestamp)
     ORDER BY interaction_date DESC
@@ -55,7 +55,7 @@ export const kpiQueries = {
   avgSatisfaction: `
     SELECT AVG(satisfaction_score) as avg_satisfaction,
            DATE(start_timestamp) as interaction_date
-    FROM customer_interactions 
+    FROM subscriber_interactions 
     WHERE satisfaction_score IS NOT NULL 
       AND start_timestamp >= CURRENT_DATE - INTERVAL '7 days'
     GROUP BY DATE(start_timestamp)
@@ -67,11 +67,11 @@ export const kpiQueries = {
   channelPerformance: `
     SELECT c.channel_name,
            COUNT(*) as interaction_count,
-           AVG(ci.satisfaction_score) as avg_satisfaction,
-           AVG(ci.duration_seconds) as avg_duration
-    FROM customer_interactions ci
-    JOIN channels c ON ci.channel_id = c.channel_id
-    WHERE ci.start_timestamp >= CURRENT_DATE - INTERVAL '30 days'
+           AVG(si.satisfaction_score) as avg_satisfaction,
+           AVG(si.duration_seconds) as avg_duration
+    FROM subscriber_interactions si
+    JOIN channels c ON si.channel_id = c.channel_id
+    WHERE si.start_timestamp >= CURRENT_DATE - INTERVAL '30 days'
     GROUP BY c.channel_id, c.channel_name
     ORDER BY interaction_count DESC
     LIMIT 8;
@@ -82,12 +82,12 @@ export const kpiQueries = {
     SELECT a.agent_name,
            a.department,
            COUNT(*) as interactions_handled,
-           AVG(ci.satisfaction_score) as avg_satisfaction,
-           AVG(ci.duration_seconds) as avg_duration
-    FROM customer_interactions ci
-    JOIN agents a ON ci.agent_id = a.agent_id
-    WHERE ci.start_timestamp >= CURRENT_DATE - INTERVAL '30 days'
-      AND ci.agent_id IS NOT NULL
+           AVG(si.satisfaction_score) as avg_satisfaction,
+           AVG(si.duration_seconds) as avg_duration
+    FROM subscriber_interactions si
+    JOIN agents a ON si.agent_id = a.agent_id
+    WHERE si.start_timestamp >= CURRENT_DATE - INTERVAL '30 days'
+      AND si.agent_id IS NOT NULL
     GROUP BY a.agent_id, a.agent_name, a.department
     ORDER BY interactions_handled DESC
     LIMIT 10;
@@ -98,7 +98,7 @@ export const kpiQueries = {
     SELECT resolution_status,
            COUNT(*) as count,
            DATE(start_timestamp) as interaction_date
-    FROM customer_interactions
+    FROM subscriber_interactions
     WHERE start_timestamp >= CURRENT_DATE - INTERVAL '7 days'
     GROUP BY resolution_status, DATE(start_timestamp)
     ORDER BY interaction_date DESC;
@@ -109,7 +109,7 @@ export const kpiQueries = {
     SELECT COUNT(*) as today_interactions,
            AVG(satisfaction_score) as today_satisfaction,
            COUNT(CASE WHEN resolution_status = 'Resolved' THEN 1 END) * 100.0 / COUNT(*) as today_resolution_rate
-    FROM customer_interactions
+    FROM subscriber_interactions
     WHERE DATE(start_timestamp) = CURRENT_DATE;
   `,
   
@@ -118,38 +118,38 @@ export const kpiQueries = {
     SELECT COUNT(*) as total_interactions,
            AVG(satisfaction_score) as overall_satisfaction,
            COUNT(CASE WHEN resolution_status = 'Resolved' THEN 1 END) * 100.0 / COUNT(*) as overall_resolution_rate
-    FROM customer_interactions;
+    FROM subscriber_interactions;
   `,
   
-  // Customer segment analysis
+  // Subscriber segments analysis
   customerSegments: `
-    SELECT c.customer_segment,
-           COUNT(DISTINCT ci.customer_id) as unique_customers,
+    SELECT s.subscriber_type,
+           COUNT(DISTINCT si.subscriber_id) as unique_subscribers,
            COUNT(*) as total_interactions,
-           AVG(ci.satisfaction_score) as avg_satisfaction
-    FROM customer_interactions ci
-    JOIN customers c ON ci.customer_id = c.customer_id
-    WHERE ci.start_timestamp >= CURRENT_DATE - INTERVAL '30 days'
-    GROUP BY c.customer_segment
+           AVG(si.satisfaction_score) as avg_satisfaction
+    FROM subscriber_interactions si
+    JOIN subscribers s ON si.subscriber_id = s.subscriber_id
+    WHERE si.start_timestamp >= CURRENT_DATE - INTERVAL '30 days'
+    GROUP BY s.subscriber_type
     ORDER BY total_interactions DESC;
   `,
   
-  // Interaction types analysis
+  // Transaction types analysis
   interactionTypes: `
-    SELECT it.interaction_name,
-           it.category,
+    SELECT tt.transaction_name,
            COUNT(*) as interaction_count,
-           AVG(ci.duration_seconds) as avg_duration,
-           AVG(ci.satisfaction_score) as avg_satisfaction
-    FROM customer_interactions ci
-    JOIN interaction_types it ON ci.interaction_type_id = it.interaction_type_id
-    WHERE ci.start_timestamp >= CURRENT_DATE - INTERVAL '30 days'
-    GROUP BY it.interaction_type_id, it.interaction_name, it.category
+           AVG(si.duration_seconds) as avg_duration,
+           AVG(si.satisfaction_score) as avg_satisfaction
+    FROM subscriber_interactions si
+    JOIN transaction_types tt ON si.transaction_type_id = tt.transaction_type_id
+    WHERE si.start_timestamp >= CURRENT_DATE - INTERVAL '30 days'
+    GROUP BY tt.transaction_type_id, tt.transaction_name
     ORDER BY interaction_count DESC
     LIMIT 10;
   `,
   
-  // Service plan performance
+  // Service plan performance - Not applicable to new schema
+  /*
   servicePlans: `
     SELECT sp.plan_name,
            sp.plan_type,
@@ -165,6 +165,7 @@ export const kpiQueries = {
     ORDER BY customer_count DESC
     LIMIT 10;
   `
+  */
 };
 
 // Parse query results based on the response format from your agent

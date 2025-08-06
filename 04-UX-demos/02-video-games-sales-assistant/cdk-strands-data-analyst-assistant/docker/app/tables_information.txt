@@ -1,54 +1,56 @@
 <db_tables_available>
 <tables>
     <table>
-    <table_name>customers</table_name>
-    <table_description>Core customer information and profiles for mobile subscribers</table_description>
+    <table_name>subscribers</table_name>
+    <table_description>Core subscriber information and profiles for Telcel mobile subscribers</table_description>
     <table_schema>
-    customers (
-        customer_id SERIAL PRIMARY KEY,
+    subscribers (
+        subscriber_id SERIAL PRIMARY KEY,
         customer_name VARCHAR(100) NOT NULL,
         email VARCHAR(150) UNIQUE,
-        phone VARCHAR(20),
+        msisdn VARCHAR(20),
         registration_date DATE NOT NULL DEFAULT CURRENT_DATE,
-        customer_segment VARCHAR(20) CHECK (customer_segment IN ('Premium', 'Standard', 'Basic')) DEFAULT 'Standard',
+        subscriber_type VARCHAR(20) CHECK (subscriber_type IN ('prepaid', 'postpaid', 'mix')) DEFAULT 'prepaid',
+        region VARCHAR(10) CHECK (region IN ('R9', 'DEUR')),
         status VARCHAR(20) CHECK (status IN ('Active', 'Inactive', 'Suspended')) DEFAULT 'Active',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     </table_schema>
     <data_dictionary>
-    customer_id: Unique identifier for each customer
-    customer_name: Full name of the customer
-    email: Customer's email address
-    phone: Customer's phone number
-    registration_date: Date when customer registered
-    customer_segment: Business segment (Premium, Standard, Basic)
+    subscriber_id: Unique identifier for each Telcel subscriber
+    customer_name: Full name of the subscriber
+    email: Subscriber's email address (format: subscriber_{index}_{username}@telcel.com)
+    msisdn: Mexican mobile number in +521 format with authentic area codes
+    registration_date: Date when subscriber registered with Telcel
+    subscriber_type: Service type (prepaid 80%, postpaid 20%, mix)
+    region: Telcel region (R9 60%, DEUR 40%)
     status: Current account status (Active, Inactive, Suspended)
     </data_dictionary>
     </table>
 
     <table>
     <table_name>channels</table_name>
-    <table_description>Communication channels catalog (Phone, Email, Chat, etc.)</table_description>
+    <table_description>Communication channels catalog for Telcel customer interactions</table_description>
     <table_schema>
     channels (
         channel_id SERIAL PRIMARY KEY,
         channel_name VARCHAR(50) NOT NULL UNIQUE,
-        channel_type VARCHAR(30) CHECK (channel_type IN ('Digital', 'Voice', 'In-Person')) NOT NULL,
+        channel_type VARCHAR(30) CHECK (channel_type IN ('WebApp', 'MobileApp')) NOT NULL,
         is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     </table_schema>
     <data_dictionary>
     channel_id: Unique identifier for each channel
-    channel_name: Display name of the channel (Phone, Email, Web Chat, Mobile App, WhatsApp, In-Store, Social Media, SMS)
-    channel_type: Type category (Digital, Voice, In-Person)
+    channel_name: Display name of the Telcel channel (9 predefined channels)
+    channel_type: Type category (WebApp, MobileApp)
     is_active: Whether channel is currently active
     </data_dictionary>
     </table>
 
     <table>
     <table_name>agents</table_name>
-    <table_description>Customer service agents catalog</table_description>
+    <table_description>Telcel customer service agents catalog</table_description>
     <table_schema>
     agents (
         agent_id SERIAL PRIMARY KEY,
@@ -63,9 +65,9 @@
     </table_schema>
     <data_dictionary>
     agent_id: Unique identifier for each agent
-    agent_name: Full name of the agent
-    employee_id: Company employee identifier
-    department: Department (Customer Service, Technical Support, Billing, Sales)
+    agent_name: Full name of the Telcel agent
+    employee_id: Telcel employee identifier (format: EMP{5_digits})
+    department: Department within Telcel customer care
     skill_level: Experience level (Junior, Senior, Expert)
     is_active: Whether agent is currently active
     hire_date: Date when agent was hired
@@ -73,93 +75,73 @@
     </table>
 
     <table>
-    <table_name>interaction_types</table_name>
-    <table_description>Types of customer interactions catalog (Support, Sales, Billing, etc.)</table_description>
+    <table_name>conversations</table_name>
+    <table_description>Track different types of subscriber conversations with Telcel</table_description>
     <table_schema>
-    interaction_types (
-        interaction_type_id SERIAL PRIMARY KEY,
-        interaction_code VARCHAR(20) NOT NULL UNIQUE,
-        interaction_name VARCHAR(100) NOT NULL,
-        category VARCHAR(50),
-        priority_level VARCHAR(20) CHECK (priority_level IN ('Low', 'Medium', 'High', 'Critical')) DEFAULT 'Medium',
-        is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    </table_schema>
-    <data_dictionary>
-    interaction_type_id: Unique identifier for each interaction type
-    interaction_code: Short code for the interaction (BILLING, TECH_SUPPORT, PLAN_CHANGE, etc.)
-    interaction_name: Full descriptive name
-    category: Main category (Billing, Technical, Account, Support, Sales)
-    priority_level: Business priority (Low, Medium, High, Critical)
-    is_active: Whether interaction type is currently active
-    </data_dictionary>
-    </table>
-
-    <table>
-    <table_name>service_plans</table_name>
-    <table_description>Available service plans and packages catalog</table_description>
-    <table_schema>
-    service_plans (
-        service_plan_id SERIAL PRIMARY KEY,
-        plan_name VARCHAR(100) NOT NULL UNIQUE,
-        plan_type VARCHAR(50),
-        monthly_fee DECIMAL(10,2),
-        data_allowance_gb INTEGER,
-        voice_minutes INTEGER,
-        sms_allowance INTEGER,
-        is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    </table_schema>
-    <data_dictionary>
-    service_plan_id: Unique identifier for each service plan
-    plan_name: Name of the service plan
-    plan_type: Type of plan (Prepaid, Postpaid, Business)
-    monthly_fee: Monthly cost of the plan
-    data_allowance_gb: Data allowance in GB
-    voice_minutes: Voice minutes included
-    sms_allowance: SMS messages included
-    is_active: Whether plan is currently available
-    </data_dictionary>
-    </table>
-
-    <table>
-    <table_name>customer_service_plans</table_name>
-    <table_description>Customer to service plan relationships and history</table_description>
-    <table_schema>
-    customer_service_plans (
-        customer_service_plan_id SERIAL PRIMARY KEY,
-        customer_id INTEGER NOT NULL REFERENCES customers(customer_id) ON DELETE CASCADE,
-        service_plan_id INTEGER NOT NULL REFERENCES service_plans(service_plan_id),
-        start_date DATE NOT NULL DEFAULT CURRENT_DATE,
-        end_date DATE,
-        is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(customer_id, service_plan_id, start_date)
-    )
-    </table_schema>
-    <data_dictionary>
-    customer_service_plan_id: Unique identifier for each customer-plan relationship
-    customer_id: Reference to customer
-    service_plan_id: Reference to service plan
-    start_date: When customer started using this plan
-    end_date: When customer stopped using this plan (NULL if current)
-    is_active: Whether this plan assignment is currently active
-    </data_dictionary>
-    </table>
-
-    <table>
-    <table_name>customer_interactions</table_name>
-    <table_description>Main fact table storing all customer interactions across all channels</table_description>
-    <table_schema>
-    customer_interactions (
-        interaction_id SERIAL PRIMARY KEY,
-        customer_id INTEGER NOT NULL REFERENCES customers(customer_id),
+    conversations (
+        conversation_id SERIAL PRIMARY KEY,
+        subscriber_id INTEGER NOT NULL REFERENCES subscribers(subscriber_id),
         channel_id INTEGER NOT NULL REFERENCES channels(channel_id),
-        interaction_type_id INTEGER NOT NULL REFERENCES interaction_types(interaction_type_id),
+        conversation_type VARCHAR(30) CHECK (conversation_type IN ('Conversaciones reales', 'BOT', 'LiveChat')) NOT NULL,
         agent_id INTEGER REFERENCES agents(agent_id),
         session_id VARCHAR(50),
+        start_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        end_timestamp TIMESTAMP,
+        duration_seconds INTEGER,
+        status VARCHAR(20) CHECK (status IN ('Active', 'Completed', 'Abandoned', 'Escalated')) DEFAULT 'Active',
+        satisfaction_score DECIMAL(3,2) CHECK (satisfaction_score BETWEEN -1.0 AND 1.0),
+        conversation_summary TEXT,
+        language VARCHAR(5) DEFAULT 'es',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    </table_schema>
+    <data_dictionary>
+    conversation_id: Unique identifier for each conversation
+    subscriber_id: Reference to Telcel subscriber
+    channel_id: Reference to communication channel used
+    conversation_type: Type of conversation (Conversaciones reales 40%, BOT 40%, LiveChat 20%)
+    agent_id: Reference to agent (NULL for BOT conversations)
+    session_id: Session identifier for grouping related conversations
+    start_timestamp: When conversation started
+    end_timestamp: When conversation ended
+    duration_seconds: Total duration of conversation in seconds
+    status: Current status (Active, Completed, Abandoned, Escalated)
+    satisfaction_score: Subscriber satisfaction score (-1.0 to 1.0)
+    conversation_summary: Brief summary of the conversation
+    language: Language used (default Spanish 'es')
+    </data_dictionary>
+    </table>
+
+    <table>
+    <table_name>transaction_types</table_name>
+    <table_description>Types of subscriber transactions catalog for Telcel services</table_description>
+    <table_schema>
+    transaction_types (
+        transaction_type_id SERIAL PRIMARY KEY,
+        transaction_name VARCHAR(100) NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    </table_schema>
+    <data_dictionary>
+    transaction_type_id: Unique identifier for each transaction type
+    transaction_name: Full descriptive name of the transaction type (12 predefined types)
+    is_active: Whether transaction type is currently active
+    </data_dictionary>
+    </table>
+
+    <table>
+    <table_name>subscriber_interactions</table_name>
+    <table_description>Main fact table storing all Telcel subscriber interactions across all channels</table_description>
+    <table_schema>
+    subscriber_interactions (
+        interaction_id SERIAL PRIMARY KEY,
+        subscriber_id INTEGER NOT NULL REFERENCES subscribers(subscriber_id),
+        channel_id INTEGER NOT NULL REFERENCES channels(channel_id),
+        transaction_type_id INTEGER NOT NULL REFERENCES transaction_types(transaction_type_id),
+        agent_id INTEGER REFERENCES agents(agent_id),
+        session_id VARCHAR(50),
+        device_type VARCHAR(20) CHECK (device_type IN ('android', 'iphone', 'other')) DEFAULT 'other',
         start_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         end_timestamp TIMESTAMP,
         duration_seconds INTEGER,
@@ -173,19 +155,20 @@
     </table_schema>
     <data_dictionary>
     interaction_id: Unique identifier for each interaction
-    customer_id: Reference to customer who initiated interaction
+    subscriber_id: Reference to Telcel subscriber who initiated interaction
     channel_id: Reference to channel used for interaction
-    interaction_type_id: Reference to type of interaction
+    transaction_type_id: Reference to type of transaction (12 predefined types)
     agent_id: Reference to agent who handled interaction (NULL for self-service)
     session_id: Session identifier for grouping related interactions
+    device_type: Device used for interaction (android 60%, iphone 35%, other 5%)
     start_timestamp: When interaction started
     end_timestamp: When interaction ended (NULL for ongoing)
     duration_seconds: Total duration of interaction in seconds
-    queue_time_seconds: Time customer waited before being served
-    resolution_status: Current status (Resolved, Pending, Escalated, Cancelled)
-    satisfaction_score: Customer satisfaction score (-1.0 to 1.0, where -1 is very dissatisfied, 1 is very satisfied)
+    queue_time_seconds: Time subscriber waited before being served
+    resolution_status: Current status (Resolved 75%, Pending, Escalated, Cancelled)
+    satisfaction_score: Subscriber satisfaction score (-1.0 to 1.0)
     interaction_summary: Brief summary of the interaction
-    language: Language used during interaction
+    language: Language used during interaction (default Spanish 'es')
     </data_dictionary>
     </table>
 </tables>

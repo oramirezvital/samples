@@ -180,3 +180,4 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 04-UX-demos/02-video-games-sales-assistant/model/simplified_synthetic_data*
+04-UX-demos/02-video-games-sales-assistant/model/.env.example
