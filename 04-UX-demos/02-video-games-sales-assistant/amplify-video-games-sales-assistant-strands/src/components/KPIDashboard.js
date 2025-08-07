@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Grid, Paper, Typography, CircularProgress } from '@mui/material';
+import { Box, Paper, Typography, CircularProgress } from '@mui/material';
 import Chart from 'react-apexcharts';
 import { executeDirectQuery, kpiQueries, parseQueryResult } from '../utils/DatabaseQueries';
 
 const KPIDashboard = () => {
   const [kpiData, setKpiData] = useState({
     dailyUsage: { loading: true, data: null, value: '0 TB' },
-    simInventory: { loading: true, data: null, value: '0' },
+    enterpriseOverview: { loading: true, data: null, value: '0' },
     lineSubscriptions: { loading: true, data: null, value: '0' },
     devices: { loading: true, data: null, value: '0' },
-    usageTotals: { loading: true, data: null, value: '0' }
+    billingRevenue: { loading: true, data: null, value: '$0' }
   });
 
   const [refreshInterval, setRefreshInterval] = useState(null);
@@ -22,101 +22,123 @@ const KPIDashboard = () => {
       // Execute all queries in parallel
       const [
         dailyUsageResult,
-        simInventoryResult,
+        enterpriseCountResult,
+        enterprisesByIndustryResult,
         lineSubscriptionsResult,
         devicesResult,
         totalDevicesResult,
         todayUsageResult,
         usageTotalsResult,
-        usageTotalsDailyResult
+        usageTotalsDailyResult,
+        billingOverviewResult,
+        monthlyRevenueResult
       ] = await Promise.all([
         executeDirectQuery(kpiQueries.dailyUsage, 'Daily usage trend'),
-        executeDirectQuery(kpiQueries.simInventory, 'SIM inventory status'),
+        executeDirectQuery(kpiQueries.enterpriseCount, 'Total enterprises'),
+        executeDirectQuery(kpiQueries.enterprisesByIndustry, 'Enterprises by industry'),
         executeDirectQuery(kpiQueries.lineSubscriptions, 'Total active lines'),
         executeDirectQuery(kpiQueries.devices, 'Device types'),
         executeDirectQuery(kpiQueries.totalDevices, 'Total devices'),
         executeDirectQuery(kpiQueries.todayUsage, 'Today usage'),
         executeDirectQuery(kpiQueries.usageTotals, 'Usage totals'),
-        executeDirectQuery(kpiQueries.usageTotalsDaily, 'Daily usage totals')
+        executeDirectQuery(kpiQueries.usageTotalsDaily, 'Daily usage totals'),
+        executeDirectQuery(kpiQueries.billingOverview, 'Billing overview'),
+        executeDirectQuery(kpiQueries.monthlyRevenue, 'Monthly revenue')
       ]);
 
       // Parse results
       const dailyUsageData = parseQueryResult(dailyUsageResult, 'dailyUsage');
-      const simInventoryData = parseQueryResult(simInventoryResult, 'simInventory');
+      const enterpriseCountData = parseQueryResult(enterpriseCountResult, 'enterpriseCount');
+      const enterprisesByIndustryData = parseQueryResult(enterprisesByIndustryResult, 'enterprisesByIndustry');
       const lineSubscriptionsData = parseQueryResult(lineSubscriptionsResult, 'lineSubscriptions');
       const devicesData = parseQueryResult(devicesResult, 'devices');
       const totalDevicesData = parseQueryResult(totalDevicesResult, 'totalDevices');
       const todayUsageData = parseQueryResult(todayUsageResult, 'todayUsage');
       const usageTotalsData = parseQueryResult(usageTotalsResult, 'usageTotals');
       const usageTotalsDailyData = parseQueryResult(usageTotalsDailyResult, 'usageTotalsDaily');
+      const billingOverviewData = parseQueryResult(billingOverviewResult, 'billingOverview');
+      const monthlyRevenueData = parseQueryResult(monthlyRevenueResult, 'monthlyRevenue');
 
       // Process and update state with real data
-      updateKPIData(dailyUsageData, simInventoryData, lineSubscriptionsData, devicesData, totalDevicesData, todayUsageData, usageTotalsData, usageTotalsDailyData);
+      updateKPIData(
+        dailyUsageData, 
+        enterpriseCountData, 
+        enterprisesByIndustryData, 
+        lineSubscriptionsData, 
+        devicesData, 
+        totalDevicesData, 
+        todayUsageData, 
+        usageTotalsData, 
+        usageTotalsDailyData,
+        billingOverviewData,
+        monthlyRevenueData
+      );
 
     } catch (error) {
       console.error('Error fetching real data:', error);
-      // Fallback to mock data if real data fails
-      setMockData();
+      // Set empty state instead of mock data
+      setEmptyKPIData();
     }
   };
 
-  const updateKPIData = (dailyUsageData, simInventoryData, lineSubscriptionsData, devicesData, totalDevicesData, todayUsageData, usageTotalsData, usageTotalsDailyData) => {
-    // Process daily usage data
-    const usageValues = dailyUsageData.map(item => item.total_gb);
-    const usageDates = dailyUsageData.map(item => {
+  const updateKPIData = (
+    dailyUsageData, 
+    enterpriseCountData, 
+    enterprisesByIndustryData, 
+    lineSubscriptionsData, 
+    devicesData, 
+    totalDevicesData, 
+    todayUsageData, 
+    usageTotalsData, 
+    usageTotalsDailyData,
+    billingOverviewData,
+    monthlyRevenueData
+  ) => {
+    console.log('Updating KPI data with real database results');
+    
+    // Validate and process daily usage data
+    const usageValues = Array.isArray(dailyUsageData) ? dailyUsageData.map(item => parseFloat(item.total_gb) || 0) : [];
+    const usageDates = Array.isArray(dailyUsageData) ? dailyUsageData.map(item => {
       const date = new Date(item.date);
-      return date.toLocaleDateString('en-US', { weekday: 'short' });
-    });
-    const todayUsage = todayUsageData[0]?.total_tb || 0;
+      return isNaN(date.getTime()) ? 'N/A' : date.toLocaleDateString('en-US', { weekday: 'short' });
+    }) : [];
+    const todayUsage = Array.isArray(todayUsageData) && todayUsageData[0] ? (parseFloat(todayUsageData[0].total_tb) || 0) : 0;
 
-    // Process SIM inventory data
-    const simValues = simInventoryData.map(item => item.count);
-    const simLabels = simInventoryData.map(item => {
-      switch(item.sim_status) {
-        case 'ACTIVE': return 'Active';
-        case 'INVENTORY': return 'Inventory';
-        case 'SUSPENDED': return 'Suspended';
-        default: return item.sim_status;
-      }
-    });
-    const totalSims = simValues.reduce((sum, val) => sum + val, 0);
+    // Validate and process enterprise data
+    const enterpriseValues = Array.isArray(enterprisesByIndustryData) ? enterprisesByIndustryData.map(item => parseInt(item.count) || 0) : [];
+    const enterpriseLabels = Array.isArray(enterprisesByIndustryData) ? enterprisesByIndustryData.map(item => item.industry || 'Unknown') : [];
+    const totalEnterprises = Array.isArray(enterpriseCountData) && enterpriseCountData[0] ? (parseInt(enterpriseCountData[0].total_enterprises) || 0) : 0;
 
-    // Process line subscriptions data
-    const totalActiveLines = lineSubscriptionsData[0]?.total_active_lines || 0;
+    // Validate and process line subscriptions data
+    const totalActiveLines = Array.isArray(lineSubscriptionsData) && lineSubscriptionsData[0] ? (parseInt(lineSubscriptionsData[0].total_active_lines) || 0) : 0;
 
-    // Process devices data
-    const deviceValues = devicesData.map(item => item.count);
-    const deviceLabels = devicesData.map(item => {
+    // Validate and process devices data
+    const deviceValues = Array.isArray(devicesData) ? devicesData.map(item => parseInt(item.count) || 0) : [];
+    const deviceLabels = Array.isArray(devicesData) ? devicesData.map(item => {
       switch(item.device_type) {
         case 'SMARTPHONE': return 'Smartphones';
         case 'TABLET': return 'Tablets';
         case 'IOT_DEVICE': return 'IoT Devices';
         case 'HOTSPOT': return 'Hotspots';
-        default: return 'Others';
+        default: return item.device_type || 'Others';
       }
-    });
-    const totalDevices = totalDevicesData[0]?.total_devices || 0;
+    }) : [];
+    const totalDevices = Array.isArray(totalDevicesData) && totalDevicesData[0] ? (parseInt(totalDevicesData[0].total_devices) || 0) : 0;
 
-    // Process usage totals data
-    const usageTotals = usageTotalsData[0] || { total_data_gb: 0, total_voice_minutes: 0, total_sms_count: 0 };
-    const totalDataGB = usageTotals.total_data_gb || 0;
-    const totalVoiceMinutes = usageTotals.total_voice_minutes || 0;
-    const totalSMSCount = usageTotals.total_sms_count || 0;
+    // Validate and process billing data
+    const billingOverview = Array.isArray(billingOverviewData) && billingOverviewData[0] ? billingOverviewData[0] : { total_revenue: 0, avg_bill_amount: 0, paid_bills: 0, overdue_bills: 0 };
+    const totalRevenue = parseFloat(billingOverview.total_revenue) || 0;
+    const revenueValues = Array.isArray(monthlyRevenueData) ? monthlyRevenueData.map(item => Math.round((parseFloat(item.monthly_revenue) || 0) / 1000)) : []; // Convert to thousands
+    const revenueLabels = Array.isArray(monthlyRevenueData) ? monthlyRevenueData.map(item => {
+      const date = new Date(item.month);
+      return isNaN(date.getTime()) ? 'N/A' : date.toLocaleDateString('en-US', { month: 'short' });
+    }) : [];
 
-    // Process daily usage totals for chart
-    const dailyDataValues = usageTotalsDailyData.map(item => item.daily_data_gb);
-    const dailyVoiceValues = usageTotalsDailyData.map(item => Math.round(item.daily_voice_minutes / 1000)); // Convert to thousands
-    const dailySMSValues = usageTotalsDailyData.map(item => Math.round(item.daily_sms_count / 100)); // Convert to hundreds
-    const dailyDates = usageTotalsDailyData.map(item => {
-      const date = new Date(item.date);
-      return date.toLocaleDateString('en-US', { weekday: 'short' });
-    });
-
-    // Update state with processed data
+    // Update state with processed and validated data
     setKpiData({
       dailyUsage: {
         loading: false,
-        value: `${todayUsage} TB`,
+        value: todayUsage > 0 ? `${todayUsage.toFixed(1)} TB` : 'No Data',
         data: {
           series: [
             {
@@ -144,22 +166,25 @@ const KPIDashboard = () => {
               y: {
                 formatter: (val) => `${val} GB`
               }
+            },
+            noData: {
+              text: 'No usage data available'
             }
           }
         }
       },
-      simInventory: {
+      enterpriseOverview: {
         loading: false,
-        value: totalSims.toLocaleString(),
+        value: totalEnterprises > 0 ? totalEnterprises.toLocaleString() : 'No Data',
         data: {
-          series: simValues,
+          series: enterpriseValues,
           options: {
             chart: {
               type: 'donut',
               height: 180
             },
-            labels: simLabels,
-            colors: ['#E30613', '#666666', '#CCCCCC'],
+            labels: enterpriseLabels,
+            colors: ['#E30613', '#666666', '#CCCCCC', '#999999', '#777777'],
             legend: { show: false },
             dataLabels: { enabled: false },
             plotOptions: {
@@ -170,8 +195,8 @@ const KPIDashboard = () => {
                     show: true,
                     total: {
                       show: true,
-                      label: 'Total SIMs',
-                      formatter: () => totalSims.toLocaleString()
+                      label: 'Total Enterprises',
+                      formatter: () => totalEnterprises > 0 ? totalEnterprises.toLocaleString() : 'No Data'
                     }
                   }
                 }
@@ -181,18 +206,21 @@ const KPIDashboard = () => {
               y: {
                 formatter: (val) => val.toLocaleString()
               }
+            },
+            noData: {
+              text: 'No enterprise data available'
             }
           }
         }
       },
       lineSubscriptions: {
         loading: false,
-        value: totalActiveLines.toLocaleString(),
+        value: totalActiveLines > 0 ? totalActiveLines.toLocaleString() : 'No Data',
         data: {
           series: [
             {
               name: 'Active Lines',
-              data: [12800, 12950, 13005, 13100, 13200, 13150, totalActiveLines] // Mock trend data
+              data: totalActiveLines > 0 ? [totalActiveLines] : [] // Show current value only since we don't have trend data
             }
           ],
           options: {
@@ -217,20 +245,20 @@ const KPIDashboard = () => {
               width: 2
             },
             colors: ['#E30613'],
-            xaxis: {
-              categories: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6', 'Current']
-            },
             tooltip: {
               y: {
                 formatter: (val) => val.toLocaleString()
               }
+            },
+            noData: {
+              text: 'No line subscription data available'
             }
           }
         }
       },
       devices: {
         loading: false,
-        value: totalDevices.toLocaleString(),
+        value: totalDevices > 0 ? totalDevices.toLocaleString() : 'No Data',
         data: {
           series: [
             {
@@ -259,236 +287,119 @@ const KPIDashboard = () => {
               y: {
                 formatter: (val) => val.toLocaleString()
               }
+            },
+            noData: {
+              text: 'No device data available'
             }
           }
         }
       },
-      usageTotals: {
+      billingRevenue: {
         loading: false,
-        value: `${totalDataGB.toLocaleString()} GB`,
+        value: totalRevenue > 0 ? `$${(totalRevenue / 1000000).toFixed(1)}M` : 'No Data',
         data: {
           series: [
             {
-              name: 'Data (GB)',
-              data: dailyDataValues.reverse()
-            },
-            {
-              name: 'Voice (K min)',
-              data: dailyVoiceValues.reverse()
-            },
-            {
-              name: 'SMS (100s)',
-              data: dailySMSValues.reverse()
-            }
-          ],
-          options: {
-            chart: {
-              type: 'line',
-              height: 180,
-              toolbar: { show: false },
-              sparkline: { enabled: true }
-            },
-            stroke: {
-              curve: 'smooth',
-              colors: ['#E30613', '#666666', '#CCCCCC'],
-              width: 2
-            },
-            xaxis: {
-              categories: dailyDates.reverse()
-            },
-            colors: ['#E30613', '#666666', '#CCCCCC'],
-            tooltip: {
-              y: [
-                {
-                  formatter: (val) => `${val} GB`
-                },
-                {
-                  formatter: (val) => `${val}K minutes`
-                },
-                {
-                  formatter: (val) => `${val * 100} SMS`
-                }
-              ]
-            },
-            legend: {
-              show: false
-            }
-          }
-        }
-      }
-    });
-
-    console.log('KPI data updated with real database values including usage totals');
-  };
-  const setMockData = () => {
-    console.log('Using mock data for KPIs');
-    setKpiData({
-      dailyUsage: {
-        loading: false,
-        value: '68.2 TB',
-        data: {
-          series: [
-            {
-              name: 'Data Usage (GB)',
-              data: [45, 52, 38, 65, 49, 75, 68]
-            }
-          ],
-          options: {
-            chart: {
-              type: 'line',
-              height: 180,
-              toolbar: { show: false },
-              sparkline: { enabled: true }
-            },
-            stroke: {
-              curve: 'smooth',
-              colors: ['#E30613'],
-              width: 3
-            },
-            xaxis: {
-              categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-            },
-            colors: ['#E30613']
-          }
-        }
-      },
-      simInventory: {
-        loading: false,
-        value: '10,000',
-        data: {
-          series: [8450, 1200, 350],
-          options: {
-            chart: {
-              type: 'donut',
-              height: 180
-            },
-            labels: ['Active', 'Inventory', 'Suspended'],
-            colors: ['#E30613', '#666666', '#CCCCCC'],
-            legend: { show: false },
-            dataLabels: { enabled: false },
-            plotOptions: {
-              pie: {
-                donut: {
-                  size: '70%',
-                  labels: {
-                    show: true,
-                    total: {
-                      show: true,
-                      label: 'Total SIMs',
-                      formatter: () => '10,000'
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      lineSubscriptions: {
-        loading: false,
-        value: '13,005',
-        data: {
-          series: [
-            {
-              name: 'Active Lines',
-              data: [12800, 12950, 13005, 13100, 13200, 13150, 13005]
-            }
-          ],
-          options: {
-            chart: {
-              type: 'area',
-              height: 180,
-              toolbar: { show: false },
-              sparkline: { enabled: true }
-            },
-            fill: {
-              type: 'gradient',
-              gradient: {
-                shadeIntensity: 1,
-                opacityFrom: 0.7,
-                opacityTo: 0.3,
-                stops: [0, 90, 100]
-              }
-            },
-            stroke: {
-              curve: 'smooth',
-              colors: ['#E30613'],
-              width: 2
-            },
-            colors: ['#E30613'],
-            xaxis: {
-              categories: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6', 'Week 7']
-            }
-          }
-        }
-      },
-      devices: {
-        loading: false,
-        value: '11,500',
-        data: {
-          series: [
-            {
-              name: 'Devices',
-              data: [5200, 3800, 1500, 800, 200]
+              name: 'Revenue ($K)',
+              data: revenueValues.reverse()
             }
           ],
           options: {
             chart: {
               type: 'bar',
               height: 180,
-              toolbar: { show: false }
+              toolbar: { show: false },
+              sparkline: { enabled: true }
             },
             plotOptions: {
               bar: {
-                horizontal: true,
-                borderRadius: 4
+                borderRadius: 4,
+                columnWidth: '60%'
               }
             },
             colors: ['#E30613'],
             xaxis: {
-              categories: ['Smartphones', 'Tablets', 'IoT Devices', 'Hotspots', 'Others']
+              categories: revenueLabels.reverse()
             },
-            dataLabels: { enabled: false }
+            tooltip: {
+              y: {
+                formatter: (val) => `$${val}K`
+              }
+            },
+            noData: {
+              text: 'No billing data available'
+            }
+          }
+        }
+      }
+    });
+
+    console.log('KPI data updated with real wireless carrier database values');
+  };
+  const setEmptyKPIData = () => {
+    console.log('Setting empty KPI data due to database connection issues');
+    setKpiData({
+      dailyUsage: {
+        loading: false,
+        value: 'No Data',
+        data: {
+          series: [{ name: 'Data Usage (GB)', data: [] }],
+          options: {
+            chart: { type: 'line', height: 180, toolbar: { show: false }, sparkline: { enabled: true } },
+            stroke: { curve: 'smooth', colors: ['#E30613'], width: 3 },
+            colors: ['#E30613'],
+            noData: { text: 'No data available' }
           }
         }
       },
-      usageTotals: {
+      enterpriseOverview: {
         loading: false,
-        value: '2,048 GB',
+        value: 'No Data',
         data: {
-          series: [
-            {
-              name: 'Data (GB)',
-              data: [45, 52, 38, 65, 49, 75, 68]
-            },
-            {
-              name: 'Voice (K min)',
-              data: [3.6, 4.5, 3.2, 4.1, 3.8, 3.9, 4.2]
-            },
-            {
-              name: 'SMS (100s)',
-              data: [15, 21, 14, 19, 16, 17, 18]
-            }
-          ],
+          series: [],
           options: {
-            chart: {
-              type: 'line',
-              height: 180,
-              toolbar: { show: false },
-              sparkline: { enabled: true }
-            },
-            stroke: {
-              curve: 'smooth',
-              colors: ['#E30613', '#666666', '#CCCCCC'],
-              width: 2
-            },
-            xaxis: {
-              categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-            },
-            colors: ['#E30613', '#666666', '#CCCCCC'],
-            legend: {
-              show: false
-            }
+            chart: { type: 'donut', height: 180 },
+            labels: [],
+            colors: ['#E30613', '#666666', '#CCCCCC', '#999999', '#777777'],
+            legend: { show: false },
+            dataLabels: { enabled: false },
+            noData: { text: 'No data available' }
+          }
+        }
+      },
+      lineSubscriptions: {
+        loading: false,
+        value: 'No Data',
+        data: {
+          series: [{ name: 'Active Lines', data: [] }],
+          options: {
+            chart: { type: 'area', height: 180, toolbar: { show: false }, sparkline: { enabled: true } },
+            colors: ['#E30613'],
+            noData: { text: 'No data available' }
+          }
+        }
+      },
+      devices: {
+        loading: false,
+        value: 'No Data',
+        data: {
+          series: [{ name: 'Devices', data: [] }],
+          options: {
+            chart: { type: 'bar', height: 180, toolbar: { show: false } },
+            colors: ['#E30613'],
+            noData: { text: 'No data available' }
+          }
+        }
+      },
+      billingRevenue: {
+        loading: false,
+        value: 'No Data',
+        data: {
+          series: [{ name: 'Revenue ($K)', data: [] }],
+          options: {
+            chart: { type: 'bar', height: 180, toolbar: { show: false }, sparkline: { enabled: true } },
+            colors: ['#E30613'],
+            noData: { text: 'No data available' }
           }
         }
       }
@@ -563,8 +474,24 @@ const KPIDashboard = () => {
 
   return (
     <Box sx={{ p: 2, backgroundColor: '#F8F9FA' }}>
-      <Grid container spacing={3}>
-        <Grid item xs={12} sm={6} md={2.4}>
+      <Box 
+        sx={{ 
+          display: 'flex', 
+          gap: 2, 
+          flexWrap: 'wrap',
+          '@media (min-width: 1200px)': {
+            flexWrap: 'nowrap'
+          }
+        }}
+      >
+        <Box sx={{ 
+          flex: '1 1 300px', 
+          minWidth: '280px',
+          '@media (min-width: 1200px)': {
+            flex: '1 1 0',
+            minWidth: 'auto'
+          }
+        }}>
           <KPICard
             title="Daily Usage"
             value={kpiData.dailyUsage.value}
@@ -572,17 +499,31 @@ const KPIDashboard = () => {
             chart={kpiData.dailyUsage.data}
             loading={kpiData.dailyUsage.loading}
           />
-        </Grid>
-        <Grid item xs={12} sm={6} md={2.4}>
+        </Box>
+        <Box sx={{ 
+          flex: '1 1 300px', 
+          minWidth: '280px',
+          '@media (min-width: 1200px)': {
+            flex: '1 1 0',
+            minWidth: 'auto'
+          }
+        }}>
           <KPICard
-            title="SIM Inventory"
-            value={kpiData.simInventory.value}
-            subtitle="Active, inventory & suspended"
-            chart={kpiData.simInventory.data}
-            loading={kpiData.simInventory.loading}
+            title="Enterprise Overview"
+            value={kpiData.enterpriseOverview.value}
+            subtitle="Active B2B customers by industry"
+            chart={kpiData.enterpriseOverview.data}
+            loading={kpiData.enterpriseOverview.loading}
           />
-        </Grid>
-        <Grid item xs={12} sm={6} md={2.4}>
+        </Box>
+        <Box sx={{ 
+          flex: '1 1 300px', 
+          minWidth: '280px',
+          '@media (min-width: 1200px)': {
+            flex: '1 1 0',
+            minWidth: 'auto'
+          }
+        }}>
           <KPICard
             title="Line Subscriptions"
             value={kpiData.lineSubscriptions.value}
@@ -590,8 +531,15 @@ const KPIDashboard = () => {
             chart={kpiData.lineSubscriptions.data}
             loading={kpiData.lineSubscriptions.loading}
           />
-        </Grid>
-        <Grid item xs={12} sm={6} md={2.4}>
+        </Box>
+        <Box sx={{ 
+          flex: '1 1 300px', 
+          minWidth: '280px',
+          '@media (min-width: 1200px)': {
+            flex: '1 1 0',
+            minWidth: 'auto'
+          }
+        }}>
           <KPICard
             title="Devices"
             value={kpiData.devices.value}
@@ -599,17 +547,24 @@ const KPIDashboard = () => {
             chart={kpiData.devices.data}
             loading={kpiData.devices.loading}
           />
-        </Grid>
-        <Grid item xs={12} sm={6} md={2.4}>
+        </Box>
+        <Box sx={{ 
+          flex: '1 1 300px', 
+          minWidth: '280px',
+          '@media (min-width: 1200px)': {
+            flex: '1 1 0',
+            minWidth: 'auto'
+          }
+        }}>
           <KPICard
-            title="Usage Totals"
-            value={kpiData.usageTotals.value}
-            subtitle="Data, voice & SMS (30 days)"
-            chart={kpiData.usageTotals.data}
-            loading={kpiData.usageTotals.loading}
+            title="Billing Revenue"
+            value={kpiData.billingRevenue.value}
+            subtitle="Total revenue (6 months)"
+            chart={kpiData.billingRevenue.data}
+            loading={kpiData.billingRevenue.loading}
           />
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
     </Box>
   );
 };

@@ -2,315 +2,247 @@
 <tables>
     <table>
     <table_name>enterprises</table_name>
-    <table_description>Master table containing B2B customer companies that subscribe to wireless fleet management services. Each enterprise represents a business customer with multiple devices and users.</table_description>
+    <table_description>B2B customers who purchase wireless services. Each enterprise represents a business customer like Coca-Cola Company with multiple wireless lines and devices.</table_description>
     <table_schema>
     enterprises (
-        enterprise_id UUID PRIMARY KEY,
-        company_name VARCHAR(255) NOT NULL,
-        tax_id VARCHAR(50) NOT NULL UNIQUE,
-        industry_type VARCHAR(100),
-        company_size company_size_enum DEFAULT 'MEDIUM',
-        primary_contact_name VARCHAR(255),
-        primary_contact_email VARCHAR(255),
-        primary_contact_phone VARCHAR(20),
-        billing_address_line1 VARCHAR(255),
-        billing_address_line2 VARCHAR(255),
-        billing_city VARCHAR(100),
-        billing_state VARCHAR(100),
-        billing_country VARCHAR(100),
-        billing_postal_code VARCHAR(20),
-        credit_limit NUMERIC(15,2) DEFAULT 0.00,
-        payment_terms INTEGER DEFAULT 30,
-        account_status account_status_enum DEFAULT 'ACTIVE',
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        created_by UUID
+        enterprise_id SERIAL PRIMARY KEY,
+        enterprise_name VARCHAR(255) NOT NULL,
+        industry VARCHAR(100),
+        contact_person VARCHAR(255),
+        contact_email VARCHAR(255),
+        contact_phone VARCHAR(20),
+        billing_address TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        status VARCHAR(20) DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'INACTIVE', 'SUSPENDED'))
     )
     </table_schema>
     <data_dictionary>
     enterprise_id: Unique identifier for each enterprise customer
-    company_name: Business name of the enterprise customer
-    tax_id: Tax identification number (unique per enterprise)
-    industry_type: Industry sector (e.g., Healthcare, Manufacturing, Retail)
-    company_size: Size category (SMALL, MEDIUM, LARGE, ENTERPRISE)
-    primary_contact_*: Main business contact information
-    billing_address_*: Billing address details
-    credit_limit: Maximum credit limit in dollars
-    payment_terms: Payment terms in days (e.g., 30, 60, 90)
-    account_status: Current account status (ACTIVE, SUSPENDED, CLOSED)
+    enterprise_name: Company name (e.g., Coca-Cola Company, Microsoft Corporation)
+    industry: Industry sector (e.g., Technology, Healthcare, Manufacturing, Retail)
+    contact_person: Primary business contact name
+    contact_email: Primary business contact email
+    contact_phone: Primary business contact phone number
+    billing_address: Complete billing address for the enterprise
     created_at/updated_at: Timestamp tracking
+    status: Current account status (ACTIVE, INACTIVE, SUSPENDED)
     </data_dictionary>
     </table>
 
     <table>
-    <table_name>enterprise_subscriptions</table_name>
-    <table_description>Subscription contracts between enterprises and the wireless carrier. Each enterprise can have multiple subscriptions with different terms and conditions.</table_description>
+    <table_name>bundles</table_name>
+    <table_description>Service plans/packages offered to enterprises. Each bundle defines voice, data, and SMS allowances with pricing per line.</table_description>
     <table_schema>
-    enterprise_subscriptions (
-        subscription_id UUID PRIMARY KEY,
-        enterprise_id UUID NOT NULL REFERENCES enterprises(enterprise_id),
-        subscription_name VARCHAR(255) NOT NULL,
-        contract_start_date DATE NOT NULL,
-        contract_end_date DATE NOT NULL,
-        contract_type contract_type_enum NOT NULL,
-        auto_renewal BOOLEAN DEFAULT FALSE,
-        billing_cycle billing_cycle_enum DEFAULT 'MONTHLY',
-        billing_day INTEGER DEFAULT 1,
-        currency_code CHAR(3) DEFAULT 'USD',
-        volume_discount_percent NUMERIC(5,2) DEFAULT 0.00,
-        early_termination_fee NUMERIC(10,2) DEFAULT 0.00,
-        status subscription_status_enum DEFAULT 'ACTIVE',
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    bundles (
+        bundle_id SERIAL PRIMARY KEY,
+        bundle_name VARCHAR(255) NOT NULL,
+        bundle_description TEXT,
+        voice_minutes INTEGER DEFAULT 0,
+        data_gb INTEGER DEFAULT 0,
+        sms_count INTEGER DEFAULT 0,
+        price_per_line DECIMAL(10,2) NOT NULL,
+        overage_voice_rate DECIMAL(6,4) DEFAULT 0.00,
+        overage_data_rate DECIMAL(6,4) DEFAULT 0.00,
+        overage_sms_rate DECIMAL(6,4) DEFAULT 0.00,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        status VARCHAR(20) DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'INACTIVE', 'DEPRECATED'))
     )
     </table_schema>
     <data_dictionary>
-    subscription_id: Unique identifier for each subscription contract
-    enterprise_id: Which enterprise owns this subscription
-    subscription_name: Name/description of the subscription
-    contract_start_date/contract_end_date: Contract period
-    contract_type: Type of contract (ANNUAL, MULTI_YEAR, MONTH_TO_MONTH)
-    auto_renewal: Whether contract auto-renews
-    billing_cycle: How often billing occurs (MONTHLY, QUARTERLY, ANNUALLY)
-    billing_day: Day of month for billing (1-28)
-    currency_code: Currency for billing (USD, EUR, etc.)
-    volume_discount_percent: Discount percentage for volume
-    early_termination_fee: Fee for early contract termination
-    status: Subscription status (ACTIVE, SUSPENDED, CANCELLED, EXPIRED)
+    bundle_id: Unique identifier for each service bundle
+    bundle_name: Marketing name of the bundle (e.g., Enterprise Basic, Enterprise Premium)
+    bundle_description: Detailed description of the bundle features
+    voice_minutes: Monthly voice allowance in minutes (-1 for unlimited)
+    data_gb: Monthly data allowance in gigabytes (-1 for unlimited)
+    sms_count: Monthly SMS allowance count (-1 for unlimited)
+    price_per_line: Monthly price per line in USD
+    overage_voice_rate: Per-minute overage rate for voice
+    overage_data_rate: Per-MB overage rate for data
+    overage_sms_rate: Per-SMS overage rate
+    status: Bundle availability status (ACTIVE, INACTIVE, DEPRECATED)
     </data_dictionary>
     </table>
 
     <table>
     <table_name>devices</table_name>
-    <table_description>Inventory of mobile devices (phones, tablets, IoT devices) assigned to enterprise customers. Each device can be associated with a SIM card and assigned to specific users within an enterprise.</table_description>
+    <table_description>Mobile devices assigned to enterprise users including smartphones, tablets, IoT devices, and hotspots.</table_description>
     <table_schema>
     devices (
-        device_id UUID PRIMARY KEY,
-        sim_id UUID REFERENCES sim_inventory(sim_id),
-        enterprise_id UUID NOT NULL REFERENCES enterprises(enterprise_id),
-        location_id UUID REFERENCES enterprise_locations(location_id),
-        device_name VARCHAR(255),
-        device_type device_type_enum NOT NULL,
-        manufacturer VARCHAR(100),
-        model VARCHAR(100),
-        imei VARCHAR(15),
-        assigned_user VARCHAR(255),
-        department VARCHAR(100),
-        cost_center VARCHAR(50),
-        status device_status_enum DEFAULT 'ACTIVE',
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        device_id SERIAL PRIMARY KEY,
+        device_imei VARCHAR(20) UNIQUE NOT NULL,
+        device_model VARCHAR(100),
+        device_manufacturer VARCHAR(100),
+        device_type VARCHAR(50) DEFAULT 'SMARTPHONE' CHECK (device_type IN ('SMARTPHONE', 'TABLET', 'IOT_DEVICE', 'HOTSPOT', 'OTHER')),
+        purchase_date DATE,
+        warranty_expiry DATE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        status VARCHAR(20) DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'INACTIVE', 'DAMAGED', 'LOST', 'RETIRED'))
     )
     </table_schema>
     <data_dictionary>
     device_id: Unique identifier for each device
-    sim_id: Reference to associated SIM card
-    enterprise_id: Which enterprise owns this device
-    location_id: Physical location assignment
-    device_name: Custom name for the device
-    device_type: Type of device (SMARTPHONE, TABLET, IOT_DEVICE, HOTSPOT)
-    manufacturer: Device manufacturer (Apple, Samsung, etc.)
-    model: Specific device model
-    imei: International Mobile Equipment Identity
-    assigned_user: Name of user assigned to device
-    department: Department within enterprise
-    cost_center: Cost center for billing allocation
-    status: Device status (ACTIVE, INACTIVE, SUSPENDED, LOST, DAMAGED)
+    device_imei: International Mobile Equipment Identity (unique device identifier)
+    device_model: Specific device model (e.g., iPhone 14 Pro, Samsung Galaxy S23)
+    device_manufacturer: Device manufacturer (e.g., Apple, Samsung, Google)
+    device_type: Type of device (SMARTPHONE, TABLET, IOT_DEVICE, HOTSPOT, OTHER)
+    purchase_date: Date when device was purchased
+    warranty_expiry: Device warranty expiration date
+    status: Device status (ACTIVE, INACTIVE, DAMAGED, LOST, RETIRED)
     </data_dictionary>
     </table>
 
     <table>
-    <table_name>line_subscriptions</table_name>
-    <table_description>Individual wireless service line subscriptions. Each line represents a wireless service (voice/data plan) associated with a SIM card and potentially a device. Lines belong to enterprise subscriptions.</table_description>
+    <table_name>lines</table_name>
+    <table_description>Individual wireless service lines. Each line represents a wireless service (voice/data plan) assigned to an enterprise with a specific bundle and potentially a device.</table_description>
     <table_schema>
-    line_subscriptions (
-        line_subscription_id UUID PRIMARY KEY,
-        subscription_id UUID NOT NULL REFERENCES enterprise_subscriptions(subscription_id),
-        sim_id UUID NOT NULL REFERENCES sim_inventory(sim_id),
-        plan_id UUID NOT NULL REFERENCES service_plans(plan_id),
-        device_id UUID REFERENCES devices(device_id),
-        location_id UUID REFERENCES enterprise_locations(location_id),
-        line_nickname VARCHAR(255),
-        cost_center VARCHAR(50),
+    lines (
+        line_id SERIAL PRIMARY KEY,
+        enterprise_id INTEGER NOT NULL REFERENCES enterprises(enterprise_id),
+        bundle_id INTEGER NOT NULL REFERENCES bundles(bundle_id),
+        device_id INTEGER REFERENCES devices(device_id),
+        phone_number VARCHAR(20) UNIQUE NOT NULL,
+        sim_card_number VARCHAR(20) UNIQUE,
+        employee_name VARCHAR(255),
+        employee_email VARCHAR(255),
         department VARCHAR(100),
-        service_start_date DATE NOT NULL,
-        service_end_date DATE,
-        status line_status_enum DEFAULT 'ACTIVE',
-        suspension_reason VARCHAR(255),
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        activation_date DATE NOT NULL,
+        deactivation_date DATE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        status VARCHAR(20) DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'SUSPENDED', 'TERMINATED', 'PENDING'))
     )
     </table_schema>
     <data_dictionary>
-    line_subscription_id: Unique identifier for each line subscription
-    subscription_id: Reference to enterprise subscription (NOT directly to enterprise)
-    sim_id: Associated SIM card
-    plan_id: Service plan being used
+    line_id: Unique identifier for each line
+    enterprise_id: Which enterprise owns this line (direct relationship)
+    bundle_id: Service bundle/plan being used
     device_id: Associated device (if any)
-    location_id: Service location
-    line_nickname: Custom name for the line
-    cost_center/department: Billing and organizational allocation
-    service_start_date/service_end_date: Service period
-    status: Line status (ACTIVE, SUSPENDED, CANCELLED)
-    suspension_reason: Reason for suspension if applicable
+    phone_number: Assigned phone number for the line
+    sim_card_number: Associated SIM card number
+    employee_name: Name of employee assigned to this line
+    employee_email: Email of employee assigned to this line
+    department: Department within enterprise (e.g., Sales, Marketing, Engineering)
+    activation_date: When line was activated
+    deactivation_date: When line was deactivated (if applicable)
+    status: Line status (ACTIVE, SUSPENDED, TERMINATED, PENDING)
     </data_dictionary>
     </table>
 
     <table>
     <table_name>daily_usage</table_name>
-    <table_description>Daily usage tracking for each line subscription including data, voice, and SMS usage both domestic and roaming.</table_description>
+    <table_description>Daily usage tracking per line for voice, data, and SMS including both domestic and roaming usage with associated charges.</table_description>
     <table_schema>
     daily_usage (
-        usage_id UUID PRIMARY KEY,
-        line_subscription_id UUID NOT NULL REFERENCES line_subscriptions(line_subscription_id),
+        usage_id SERIAL PRIMARY KEY,
+        line_id INTEGER NOT NULL REFERENCES lines(line_id),
         usage_date DATE NOT NULL,
-        data_usage_mb NUMERIC(15,3) DEFAULT 0,
-        data_usage_roaming_mb NUMERIC(15,3) DEFAULT 0,
-        voice_usage_minutes NUMERIC(10,2) DEFAULT 0,
-        voice_usage_roaming_minutes NUMERIC(10,2) DEFAULT 0,
-        sms_usage_count INTEGER DEFAULT 0,
-        sms_usage_roaming_count INTEGER DEFAULT 0,
-        primary_country_code CHAR(2),
-        roaming_countries TEXT[],
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        voice_minutes INTEGER DEFAULT 0,
+        voice_minutes_roaming INTEGER DEFAULT 0,
+        data_mb INTEGER DEFAULT 0,
+        data_mb_roaming INTEGER DEFAULT 0,
+        sms_count INTEGER DEFAULT 0,
+        sms_count_roaming INTEGER DEFAULT 0,
+        voice_charges DECIMAL(8,2) DEFAULT 0.00,
+        data_charges DECIMAL(8,2) DEFAULT 0.00,
+        sms_charges DECIMAL(8,2) DEFAULT 0.00,
+        roaming_charges DECIMAL(8,2) DEFAULT 0.00,
+        total_charges DECIMAL(8,2) DEFAULT 0.00,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(line_id, usage_date)
     )
     </table_schema>
     <data_dictionary>
     usage_id: Unique identifier for each daily usage record
-    line_subscription_id: Which line this usage belongs to
+    line_id: Which line this usage belongs to
     usage_date: Date of usage
-    data_usage_mb: Domestic data usage in megabytes
-    data_usage_roaming_mb: Roaming data usage in megabytes
-    voice_usage_minutes: Domestic voice usage in minutes
-    voice_usage_roaming_minutes: Roaming voice usage in minutes
-    sms_usage_count: Domestic SMS count
-    sms_usage_roaming_count: Roaming SMS count
-    primary_country_code: Primary country of usage
-    roaming_countries: Array of countries where roaming occurred
+    voice_minutes: Domestic voice usage in minutes for the day
+    voice_minutes_roaming: Roaming voice usage in minutes for the day
+    data_mb: Domestic data usage in megabytes for the day
+    data_mb_roaming: Roaming data usage in megabytes for the day
+    sms_count: Domestic SMS count for the day
+    sms_count_roaming: Roaming SMS count for the day
+    voice_charges: Voice charges for the day
+    data_charges: Data charges for the day
+    sms_charges: SMS charges for the day
+    roaming_charges: Roaming charges for the day
+    total_charges: Total charges for the day (sum of all charge types)
     </data_dictionary>
     </table>
 
     <table>
     <table_name>bills</table_name>
-    <table_description>Monthly billing statements for enterprise customers containing total charges and billing details.</table_description>
+    <table_description>Monthly billing statements for enterprises containing total charges, line counts, and billing details.</table_description>
     <table_schema>
     bills (
-        bill_id UUID PRIMARY KEY,
-        enterprise_id UUID NOT NULL REFERENCES enterprises(enterprise_id),
-        bill_number VARCHAR(50) NOT NULL UNIQUE,
+        bill_id SERIAL PRIMARY KEY,
+        enterprise_id INTEGER NOT NULL REFERENCES enterprises(enterprise_id),
         billing_period_start DATE NOT NULL,
         billing_period_end DATE NOT NULL,
-        subtotal_amount NUMERIC(15,2) DEFAULT 0.00,
-        tax_amount NUMERIC(15,2) DEFAULT 0.00,
-        total_amount NUMERIC(15,2) DEFAULT 0.00,
+        total_lines INTEGER NOT NULL DEFAULT 0,
+        base_charges DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+        overage_charges DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+        taxes DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+        total_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
         due_date DATE NOT NULL,
-        payment_status payment_status_enum DEFAULT 'PENDING',
-        payment_date DATE,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        paid_date DATE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        status VARCHAR(20) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'PAID', 'OVERDUE', 'CANCELLED'))
     )
     </table_schema>
     <data_dictionary>
     bill_id: Unique identifier for each bill
-    enterprise_id: Which enterprise this bill belongs to
-    bill_number: Human-readable bill number
-    billing_period_start/end: Billing period dates
-    subtotal_amount: Pre-tax total
-    tax_amount: Tax charges
-    total_amount: Final amount due
+    enterprise_id: Which enterprise this bill belongs to (direct relationship)
+    billing_period_start/billing_period_end: Billing period dates
+    total_lines: Number of active lines during billing period
+    base_charges: Base monthly charges for all lines
+    overage_charges: Additional charges for usage over plan limits
+    taxes: Tax charges applied to the bill
+    total_amount: Final amount due (base + overage + taxes)
     due_date: Payment due date
-    payment_status: Payment status (PENDING, PAID, OVERDUE, PARTIAL)
-    payment_date: Date payment was received
-    </data_dictionary>
-    </table>
-
-    <table>
-    <table_name>service_plans</table_name>
-    <table_description>Available wireless service plans with data allowances, pricing, and features.</table_description>
-    <table_schema>
-    service_plans (
-        plan_id UUID PRIMARY KEY,
-        plan_name VARCHAR(255) NOT NULL,
-        plan_type plan_type_enum NOT NULL,
-        data_allowance_mb BIGINT,
-        voice_allowance_minutes INTEGER,
-        sms_allowance_count INTEGER,
-        monthly_price NUMERIC(10,2) NOT NULL,
-        overage_data_rate NUMERIC(6,4),
-        overage_voice_rate NUMERIC(6,4),
-        overage_sms_rate NUMERIC(6,4),
-        international_roaming BOOLEAN DEFAULT FALSE,
-        plan_status plan_status_enum DEFAULT 'ACTIVE',
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
-    </table_schema>
-    <data_dictionary>
-    plan_id: Unique identifier for each service plan
-    plan_name: Marketing name of the plan
-    plan_type: Type of plan (UNLIMITED, METERED, POOLED, IOT)
-    data_allowance_mb: Monthly data allowance in MB (NULL for unlimited)
-    voice_allowance_minutes: Monthly voice allowance in minutes
-    sms_allowance_count: Monthly SMS allowance count
-    monthly_price: Base monthly price in dollars
-    overage_*_rate: Per-unit overage rates
-    international_roaming: Whether international roaming is included
-    plan_status: Plan availability status (ACTIVE, DEPRECATED, DISCONTINUED)
-    </data_dictionary>
-    </table>
-
-    <table>
-    <table_name>sim_inventory</table_name>
-    <table_description>SIM card inventory management including SIM status, assignments, and technical details.</table_description>
-    <table_schema>
-    sim_inventory (
-        sim_id UUID PRIMARY KEY,
-        iccid VARCHAR(22) NOT NULL UNIQUE,
-        msisdn VARCHAR(15),
-        enterprise_id UUID REFERENCES enterprises(enterprise_id),
-        sim_status sim_status_enum DEFAULT 'INVENTORY',
-        activation_date DATE,
-        deactivation_date DATE,
-        last_usage_date DATE,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )
-    </table_schema>
-    <data_dictionary>
-    sim_id: Unique identifier for each SIM card
-    iccid: Integrated Circuit Card Identifier (unique SIM identifier)
-    msisdn: Mobile Station International Subscriber Directory Number (phone number)
-    enterprise_id: Which enterprise owns this SIM (if assigned)
-    sim_status: Current status (INVENTORY, ACTIVE, SUSPENDED, DEACTIVATED, LOST)
-    activation_date: When SIM was first activated
-    deactivation_date: When SIM was deactivated (if applicable)
-    last_usage_date: Last date of recorded usage
+    paid_date: Date payment was received (NULL if unpaid)
+    status: Payment status (PENDING, PAID, OVERDUE, CANCELLED)
     </data_dictionary>
     </table>
 </tables>
 
 <business_rules>
 - **IMPORTANT RELATIONSHIPS**: 
-  - To get enterprise data for line subscriptions: enterprises → enterprise_subscriptions → line_subscriptions
-  - To get enterprise data for devices: enterprises → devices (direct relationship)
-  - To get enterprise data for bills: enterprises → bills (direct relationship)
+  - enterprises → lines (direct relationship via enterprise_id)
+  - enterprises → bills (direct relationship via enterprise_id)
+  - lines → bundles (via bundle_id)
+  - lines → devices (via device_id, optional)
+  - lines → daily_usage (via line_id)
   
 - **Key Joins**:
-  - enterprises.enterprise_id = enterprise_subscriptions.enterprise_id
-  - enterprise_subscriptions.subscription_id = line_subscriptions.subscription_id
-  - enterprises.enterprise_id = devices.enterprise_id
+  - enterprises.enterprise_id = lines.enterprise_id
   - enterprises.enterprise_id = bills.enterprise_id
+  - lines.bundle_id = bundles.bundle_id
+  - lines.device_id = devices.device_id (optional)
+  - lines.line_id = daily_usage.line_id
 
 - **Status Values**:
-  - line_subscriptions.status: 'ACTIVE', 'SUSPENDED', 'CANCELLED'
-  - devices.status: 'ACTIVE', 'INACTIVE', 'SUSPENDED', 'LOST', 'DAMAGED'
-  - enterprises.account_status: 'ACTIVE', 'SUSPENDED', 'CLOSED'
+  - lines.status: 'ACTIVE', 'SUSPENDED', 'TERMINATED', 'PENDING'
+  - devices.status: 'ACTIVE', 'INACTIVE', 'DAMAGED', 'LOST', 'RETIRED'
+  - enterprises.status: 'ACTIVE', 'INACTIVE', 'SUSPENDED'
+  - bundles.status: 'ACTIVE', 'INACTIVE', 'DEPRECATED'
+  - bills.status: 'PENDING', 'PAID', 'OVERDUE', 'CANCELLED'
 
-- Each enterprise can have multiple subscriptions
-- Each subscription can have multiple line subscriptions
-- Each line subscription is associated with one SIM card
-- Each device can be associated with one SIM card at a time
-- Daily usage is tracked per line subscription
-- Bills are generated monthly per enterprise and contain charges for all their services
+- **Data Types and Limits**:
+  - Unlimited plans: -1 value in bundles (voice_minutes, data_gb, sms_count)
+  - Phone numbers: Format +1-XXXXXXXXXX
+  - Usage tracking: Daily granularity per line
+  - Billing: Monthly billing cycles per enterprise
+  - Charges: Calculated based on bundle overage rates
+
+- **Common Queries**:
+  - Voice calls per client: SUM(voice_minutes + voice_minutes_roaming) from daily_usage grouped by enterprise
+  - Data usage per enterprise: SUM(data_mb + data_mb_roaming) from daily_usage
+  - Revenue per enterprise: SUM(total_amount) from bills
+  - Active lines per enterprise: COUNT(*) from lines WHERE status = 'ACTIVE'
 </business_rules>
 </db_tables_available>

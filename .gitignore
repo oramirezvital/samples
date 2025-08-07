@@ -179,3 +179,4 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+04-UX-demos/02-video-games-sales-assistant/model/setup_wireless_database.sh
