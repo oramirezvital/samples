@@ -76,13 +76,14 @@ export const kpiQueries = {
   
   lineSubscriptionsTrend: `
     SELECT 
-      DATE_TRUNC('week', activation_date) as week,
-      COUNT(*) as weekly_count
+      DATE(activation_date) as date,
+      COUNT(*) as daily_activations,
+      SUM(COUNT(*)) OVER (ORDER BY DATE(activation_date)) as cumulative_lines
     FROM lines 
     WHERE status = 'ACTIVE' 
-      AND activation_date >= CURRENT_DATE - INTERVAL '7 weeks'
-    GROUP BY DATE_TRUNC('week', activation_date)
-    ORDER BY week ASC
+      AND activation_date >= CURRENT_DATE - INTERVAL '7 days'
+    GROUP BY DATE(activation_date)
+    ORDER BY date ASC
     LIMIT 7;
   `,
   
@@ -312,7 +313,9 @@ const parseSingleValueResponse = (result, queryType) => {
   
   for (const line of lines) {
     // Skip explanatory text
-    if (line.includes('SELECT') || line.includes('I\'ll execute') || line.includes('Query')) {
+    if (line.includes('SELECT') || line.includes('I\'ll execute') || line.includes('Query') || 
+        line.includes('Raw results') || line.includes('Count') || line.includes('Getting') ||
+        line.includes('Counting') || line.includes('Calculating') || line.includes('---')) {
       continue;
     }
     
@@ -332,6 +335,37 @@ const parseSingleValueResponse = (result, queryType) => {
           return [{ total_tb: value }];
         default:
           return [{ value: value }];
+      }
+    }
+  }
+  
+  // If no number found, try to parse table-like single column data
+  const headerLine = lines.find(line => 
+    line.includes('total_') || line.includes('count') || line.includes('enterprises') || 
+    line.includes('devices') || line.includes('lines') || line.includes('tb')
+  );
+  
+  if (headerLine) {
+    const headerIndex = lines.indexOf(headerLine);
+    // Look for the value in subsequent lines
+    for (let i = headerIndex + 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.match(/^\d+(\.\d+)?$/) || line.match(/^-+$/)) {
+        if (!line.match(/^-+$/)) {
+          const value = parseFloat(line);
+          
+          if (headerLine.includes('total_enterprises')) {
+            return [{ total_enterprises: value }];
+          } else if (headerLine.includes('total_active_lines')) {
+            return [{ total_active_lines: value }];
+          } else if (headerLine.includes('total_devices')) {
+            return [{ total_devices: value }];
+          } else if (headerLine.includes('total_tb')) {
+            return [{ total_tb: value }];
+          } else {
+            return [{ value: value }];
+          }
+        }
       }
     }
   }
@@ -406,6 +440,8 @@ const inferHeaders = (queryType, columnCount) => {
       return ['date', 'total_gb'];
     case 'enterprisesByIndustry':
       return ['industry', 'count'];
+    case 'lineSubscriptionsTrend':
+      return ['week', 'weekly_count'];
     case 'devices':
       return ['device_type', 'count'];
     case 'usageTotalsDaily':
