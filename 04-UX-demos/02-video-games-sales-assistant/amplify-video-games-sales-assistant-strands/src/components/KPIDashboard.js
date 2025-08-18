@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Paper, Typography, CircularProgress } from '@mui/material';
 import Chart from 'react-apexcharts';
 import { executeDirectQuery, kpiQueries, parseQueryResult } from '../utils/DatabaseQueries';
@@ -12,9 +12,19 @@ const KPIDashboard = () => {
     billingRevenue: { loading: true, data: null, value: '$0' }
   });
 
+  // Add refs to track fetch state and prevent multiple simultaneous fetches
+  const isFetchingRef = useRef(false);
+
   // Function to fetch real data from database
   const fetchRealData = async () => {
+    // Prevent multiple simultaneous fetches
+    if (isFetchingRef.current) {
+      console.log('Fetch already in progress, skipping...');
+      return;
+    }
+
     try {
+      isFetchingRef.current = true;
       console.log('Fetching KPI data from database...');
 
       // Execute all queries in parallel
@@ -80,6 +90,8 @@ const KPIDashboard = () => {
       console.error('Error fetching real data:', error);
       // Set empty state instead of mock data
       setEmptyKPIData();
+    } finally {
+      isFetchingRef.current = false; // Reset fetch flag
     }
   };
 
@@ -100,52 +112,80 @@ const KPIDashboard = () => {
     console.log('Updating KPI data with real database results');
     
     // Validate and process daily usage data
-    const usageValues = Array.isArray(dailyUsageData) ? dailyUsageData.map(item => parseFloat(item.total_gb) || 0) : [];
-    const usageDates = Array.isArray(dailyUsageData) ? dailyUsageData.map(item => {
-      const date = new Date(item.date);
-      return isNaN(date.getTime()) ? 'N/A' : date.toLocaleDateString('en-US', { weekday: 'short' });
-    }) : [];
-    const todayUsage = Array.isArray(todayUsageData) && todayUsageData[0] ? (parseFloat(todayUsageData[0].total_tb) || 0) : 0;
+    const usageValues = Array.isArray(dailyUsageData) && dailyUsageData.length > 0 ? 
+      dailyUsageData.map(item => parseFloat(item.total_gb) || 0).filter(val => val > 0) : [];
+    const usageDates = Array.isArray(dailyUsageData) && dailyUsageData.length > 0 ? 
+      dailyUsageData.map(item => {
+        const date = new Date(item.date);
+        return isNaN(date.getTime()) ? 'N/A' : date.toLocaleDateString('en-US', { weekday: 'short' });
+      }) : [];
+    
+    // Handle today usage with better null checking
+    let todayUsage = 0;
+    if (Array.isArray(todayUsageData) && todayUsageData[0]) {
+      const rawValue = todayUsageData[0].total_tb;
+      todayUsage = rawValue !== null && rawValue !== undefined ? parseFloat(rawValue) : 0;
+    }
 
     // Validate and process enterprise data
-    const enterpriseValues = Array.isArray(enterprisesByIndustryData) ? enterprisesByIndustryData.map(item => parseInt(item.count) || 0) : [];
-    const enterpriseLabels = Array.isArray(enterprisesByIndustryData) ? enterprisesByIndustryData.map(item => item.industry || 'Unknown') : [];
-    const totalEnterprises = Array.isArray(enterpriseCountData) && enterpriseCountData[0] ? (parseInt(enterpriseCountData[0].total_enterprises) || 0) : 0;
+    const enterpriseValues = Array.isArray(enterprisesByIndustryData) && enterprisesByIndustryData.length > 0 ? 
+      enterprisesByIndustryData.map(item => parseInt(item.count) || 0) : [0];
+    const enterpriseLabels = Array.isArray(enterprisesByIndustryData) && enterprisesByIndustryData.length > 0 ? 
+      enterprisesByIndustryData.map(item => item.industry || 'Unknown') : ['No Data'];
+    
+    // Handle different formats for enterprise count data
+    let totalEnterprises = 0;
+    if (Array.isArray(enterpriseCountData) && enterpriseCountData[0]) {
+      // Try different possible field names for enterprise count
+      totalEnterprises = parseInt(enterpriseCountData[0].total_enterprises) || 
+                        parseInt(enterpriseCountData[0].column_1) || 
+                        parseInt(enterpriseCountData[0].value) || 0;
+    }
+    
+    console.log('Raw enterpriseCountData:', enterpriseCountData);
+    console.log('Processed totalEnterprises:', totalEnterprises);
+    console.log('Enterprise values:', enterpriseValues);
+    console.log('Enterprise labels:', enterpriseLabels);
 
     // Validate and process line subscriptions data
     const totalActiveLines = Array.isArray(lineSubscriptionsData) && lineSubscriptionsData[0] ? (parseInt(lineSubscriptionsData[0].total_active_lines) || 0) : 0;
     
     // Process line subscriptions trend data
-    const trendValues = Array.isArray(lineSubscriptionsTrendData) ? lineSubscriptionsTrendData.map(item => parseInt(item.weekly_count) || parseInt(item.daily_activations) || 0) : [];
-    const trendLabels = Array.isArray(lineSubscriptionsTrendData) ? lineSubscriptionsTrendData.map(item => {
-      const date = new Date(item.week || item.date);
-      return isNaN(date.getTime()) ? 'N/A' : date.toLocaleDateString('en-US', { weekday: 'short' });
-    }) : [];
+    const trendValues = Array.isArray(lineSubscriptionsTrendData) && lineSubscriptionsTrendData.length > 0 ? 
+      lineSubscriptionsTrendData.map(item => parseInt(item.weekly_count) || parseInt(item.daily_activations) || 0) : [];
+    const trendLabels = Array.isArray(lineSubscriptionsTrendData) && lineSubscriptionsTrendData.length > 0 ? 
+      lineSubscriptionsTrendData.map(item => {
+        const date = new Date(item.week || item.date);
+        return isNaN(date.getTime()) ? 'N/A' : date.toLocaleDateString('en-US', { weekday: 'short' });
+      }) : [];
     
     // If we don't have trend data, create a simple trend ending with current total
-    const linesTrendData = trendValues.length > 0 ? trendValues : [
-      Math.max(0, totalActiveLines - 600),
-      Math.max(0, totalActiveLines - 500), 
-      Math.max(0, totalActiveLines - 300),
-      Math.max(0, totalActiveLines - 200),
-      Math.max(0, totalActiveLines - 100),
-      Math.max(0, totalActiveLines - 50),
-      totalActiveLines
-    ];
+    const linesTrendData = trendValues.length > 0 ? trendValues : 
+      totalActiveLines > 0 ? [
+        Math.max(0, totalActiveLines - 600),
+        Math.max(0, totalActiveLines - 500), 
+        Math.max(0, totalActiveLines - 300),
+        Math.max(0, totalActiveLines - 200),
+        Math.max(0, totalActiveLines - 100),
+        Math.max(0, totalActiveLines - 50),
+        totalActiveLines
+      ] : [0, 0, 0, 0, 0, 0, 0];
     const linesTrendLabels = trendLabels.length > 0 ? trendLabels : ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6', 'Current'];
 
     // Validate and process devices data
     console.log('Raw devicesData:', devicesData);
-    const deviceValues = Array.isArray(devicesData) ? devicesData.map(item => parseInt(item.count) || 0) : [];
-    const deviceLabels = Array.isArray(devicesData) ? devicesData.map(item => {
-      switch(item.device_type) {
-        case 'SMARTPHONE': return 'Smartphones';
-        case 'TABLET': return 'Tablets';
-        case 'IOT_DEVICE': return 'IoT Devices';
-        case 'HOTSPOT': return 'Hotspots';
-        default: return item.device_type || 'Others';
-      }
-    }) : [];
+    const deviceValues = Array.isArray(devicesData) && devicesData.length > 0 ? 
+      devicesData.map(item => parseInt(item.count) || 0) : [0];
+    const deviceLabels = Array.isArray(devicesData) && devicesData.length > 0 ? 
+      devicesData.map(item => {
+        switch(item.device_type) {
+          case 'SMARTPHONE': return 'Smartphones';
+          case 'TABLET': return 'Tablets';
+          case 'IOT_DEVICE': return 'IoT Devices';
+          case 'HOTSPOT': return 'Hotspots';
+          default: return item.device_type || 'Others';
+        }
+      }) : ['No Data'];
     
     // Try to get total devices from the totalDevicesData, with fallback to sum of deviceValues
     let totalDevices = 0;
@@ -178,11 +218,13 @@ const KPIDashboard = () => {
     }
     
     const totalRevenue = parseFloat(billingOverview.total_revenue) || 0;
-    const revenueValues = Array.isArray(monthlyRevenueData) ? monthlyRevenueData.map(item => Math.round((parseFloat(item.monthly_revenue) || 0) / 1000)) : []; // Convert to thousands
-    const revenueLabels = Array.isArray(monthlyRevenueData) ? monthlyRevenueData.map(item => {
-      const date = new Date(item.month);
-      return isNaN(date.getTime()) ? 'N/A' : date.toLocaleDateString('en-US', { month: 'short' });
-    }) : [];
+    const revenueValues = Array.isArray(monthlyRevenueData) && monthlyRevenueData.length > 0 ? 
+      monthlyRevenueData.map(item => Math.round((parseFloat(item.monthly_revenue) || 0) / 1000)) : [0]; // Convert to thousands
+    const revenueLabels = Array.isArray(monthlyRevenueData) && monthlyRevenueData.length > 0 ? 
+      monthlyRevenueData.map(item => {
+        const date = new Date(item.month);
+        return isNaN(date.getTime()) ? 'N/A' : date.toLocaleDateString('en-US', { month: 'short' });
+      }) : ['No Data'];
     
     console.log('Billing overview processed:', billingOverview);
     console.log('Total revenue:', totalRevenue);
@@ -191,12 +233,13 @@ const KPIDashboard = () => {
     setKpiData({
       dailyUsage: {
         loading: false,
-        value: todayUsage > 0 ? `${todayUsage.toFixed(1)} TB` : 'No Data',
+        value: todayUsage > 0 ? `${todayUsage.toFixed(1)} TB` : 
+               (usageValues.length > 0 ? `${(usageValues.reduce((a, b) => a + b, 0) / usageValues.length / 1000).toFixed(1)} TB` : 'No Data'),
         data: {
           series: [
             {
               name: 'Data Usage (GB)',
-              data: usageValues.reverse() // Reverse to show chronological order
+              data: usageValues.length > 0 ? usageValues.reverse() : [0] // Reverse to show chronological order
             }
           ],
           options: {
@@ -212,7 +255,7 @@ const KPIDashboard = () => {
               width: 3
             },
             xaxis: {
-              categories: usageDates.reverse()
+              categories: usageDates.length > 0 ? usageDates.reverse() : ['No Data']
             },
             colors: ['#E30613'],
             tooltip: {
