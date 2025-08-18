@@ -69,9 +69,12 @@ export const kpiQueries = {
   `,
   
   lineSubscriptions: `
-    SELECT COUNT(*) as total_active_lines
+    SELECT 
+      status,
+      COUNT(*) as count
     FROM lines 
-    WHERE status = 'ACTIVE';
+    GROUP BY status
+    ORDER BY count DESC;
   `,
   
   lineSubscriptionsTrend: `
