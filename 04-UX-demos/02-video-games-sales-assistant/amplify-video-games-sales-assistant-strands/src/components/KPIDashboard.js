@@ -338,6 +338,21 @@ const KPIDashboard = () => {
             colors: ['#E30613', '#666666', '#CCCCCC', '#999999', '#777777'],
             legend: { show: false },
             dataLabels: { enabled: false },
+            plotOptions: {
+              pie: {
+                donut: {
+                  size: '70%',
+                  labels: {
+                    show: true,
+                    total: {
+                      show: true,
+                      label: 'Total Enterprises',
+                      formatter: () => 'No Data'
+                    }
+                  }
+                }
+              }
+            },
             noData: { text: 'No data available' }
           }
         }
@@ -346,10 +361,28 @@ const KPIDashboard = () => {
         loading: false,
         value: 'No Data',
         data: {
-          series: [{ name: 'Active Lines', data: [] }],
+          series: [],
           options: {
-            chart: { type: 'area', height: 180, toolbar: { show: false }, sparkline: { enabled: true } },
-            colors: ['#E30613'],
+            chart: { type: 'donut', height: 180 },
+            labels: [],
+            colors: ['#E30613', '#666666', '#CCCCCC', '#999999', '#777777'],
+            legend: { show: false },
+            dataLabels: { enabled: false },
+            plotOptions: {
+              pie: {
+                donut: {
+                  size: '70%',
+                  labels: {
+                    show: true,
+                    total: {
+                      show: true,
+                      label: 'Total Lines',
+                      formatter: () => 'No Data'
+                    }
+                  }
+                }
+              }
+            },
             noData: { text: 'No data available' }
           }
         }

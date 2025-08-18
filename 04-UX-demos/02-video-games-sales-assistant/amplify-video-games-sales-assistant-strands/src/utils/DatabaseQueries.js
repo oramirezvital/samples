@@ -330,8 +330,6 @@ const parseSingleValueResponse = (result, queryType) => {
       switch (queryType) {
         case 'enterpriseCount':
           return [{ total_enterprises: value }];
-        case 'lineSubscriptions':
-          return [{ total_active_lines: value }];
         case 'totalDevices':
           return [{ total_devices: value }];
         case 'todayUsage':
@@ -443,6 +441,8 @@ const inferHeaders = (queryType, columnCount) => {
       return ['date', 'total_gb'];
     case 'enterprisesByIndustry':
       return ['industry', 'count'];
+    case 'lineSubscriptions':
+      return ['status', 'count'];
     case 'lineSubscriptionsTrend':
       return ['week', 'weekly_count'];
     case 'devices':
