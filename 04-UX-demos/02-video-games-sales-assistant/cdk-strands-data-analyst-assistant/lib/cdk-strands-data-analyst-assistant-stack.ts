@@ -19,20 +19,20 @@ export class CdkStrandsDataAnalystAssistantStack extends cdk.Stack {
     const projectId = new cdk.CfnParameter(this, "ProjectId", {
       type: "String",
       description: "Project identifier used for naming resources",
-      default: "strands-data-analyst-assistant",
+      default: "mpn-kpis-analyst-assistant",
     });
 
     const databaseName = new cdk.CfnParameter(this, "DatabaseName", {
       type: "String",
-      description: "Fleet management database name",
-      default: "fleetmanagement",
+      description: "Mobile Private Network KPIs database name",
+      default: "postgres",
     });
 
     // Parameters for existing RDS database connection
     const existingDbHost = new cdk.CfnParameter(this, "ExistingDbHost", {
       type: "String",
       description: "Existing RDS PostgreSQL database host",
-      default: "fleet-management-db.cxhelbn5konu.us-east-1.rds.amazonaws.com",
+      default: "mpn.cvqqavwijjrk.us-east-2.rds.amazonaws.com",
     });
 
     const existingDbPort = new cdk.CfnParameter(this, "ExistingDbPort", {
@@ -44,14 +44,14 @@ export class CdkStrandsDataAnalystAssistantStack extends cdk.Stack {
     const existingDbUser = new cdk.CfnParameter(this, "ExistingDbUser", {
       type: "String",
       description: "Existing RDS PostgreSQL database username",
-      default: "fleetadmin",
+      default: "postgres",
     });
 
     const existingDbPassword = new cdk.CfnParameter(this, "ExistingDbPassword", {
       type: "String",
       description: "Existing RDS PostgreSQL database password",
       noEcho: true,
-      default: "FleetMgmt2024!",
+      default: "mpnpassword123",
     });
 
     // Add a new parameter for max response size in bytes
@@ -460,25 +460,25 @@ export class CdkStrandsDataAnalystAssistantStack extends cdk.Stack {
     new cdk.CfnOutput(this, "DataSourceBucketName", {
       value: importBucket.bucketName,
       description:
-        "S3 bucket for importing data into Aurora using aws_s3 extension",
+        "S3 bucket for importing MPN KPI data into PostgreSQL using aws_s3 extension",
       exportName: `${projectId.valueAsString}-ImportBucketName`,
     });
 
     new cdk.CfnOutput(this, "QuestionAnswersTableName", {
       value: rawQueryResults.tableName,
-      description: "The name of the DynamoDB table for storing query results",
+      description: "The name of the DynamoDB table for storing MPN KPI query results",
       exportName: `${projectId.valueAsString}-QuestionAnswersTableName`,
     });
 
     new cdk.CfnOutput(this, "AgentEndpointURL", {
       value: lb.loadBalancerDnsName,
-      description: "The DNS name of the Application Load Balancer for the Strands Agent",
+      description: "The DNS name of the Application Load Balancer for the MPN KPIs Agent",
       exportName: `${projectId.valueAsString}-LoadBalancerDnsName`,
     });
 
     new cdk.CfnOutput(this, "ExistingDatabaseHost", {
       value: existingDbHost.valueAsString,
-      description: "The host of the existing fleet management database",
+      description: "The host of the existing MPN KPIs database",
       exportName: `${projectId.valueAsString}-ExistingDatabaseHost`,
     });
   }
