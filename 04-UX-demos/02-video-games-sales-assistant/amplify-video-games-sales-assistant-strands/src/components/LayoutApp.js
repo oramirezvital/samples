@@ -45,9 +45,9 @@ function LayoutApp() {
   const defaultTheme = createTheme({
     palette: {
       primary: {
-        main: "#E30613", // Claro Red
-        dark: "#B8050F", // Darker red
-        light: "#FF4757", // Lighter red
+        main: "#0066CC", // Telcel Blue
+        dark: "#004499", // Darker blue
+        light: "#1E88E5", // Lighter blue
       },
       secondary: {
         main: "#000000", // Black
@@ -85,7 +85,7 @@ function LayoutApp() {
         elevation={0}
         sx={{
           background: "linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%)",
-          borderBottom: "2px solid #E30613",
+          borderBottom: "2px solid #0066CC",
           position: "relative",
           "&::after": {
             content: '""',
@@ -96,7 +96,7 @@ function LayoutApp() {
             height: "1px",
             backgroundImage: (theme) => `linear-gradient(to right, 
                                   ${theme.palette.divider}, 
-                                  ${alpha("#E30613", 0.5)}, 
+                                  ${alpha("#0066CC", 0.5)}, 
                                   ${theme.palette.divider})`,
           },
         }}
@@ -120,7 +120,7 @@ function LayoutApp() {
               flexGrow: 1, 
               p: 0, 
               m: 0,
-              color: "#000000",
+              color: "#0066CC",
               fontWeight: 600,
             }}
           >
@@ -129,32 +129,23 @@ function LayoutApp() {
           <Box sx={{ display: { xs: "none", sm: "inline" } }}>
             <Chip
               sx={{
-                border: "1px solid #E30613",
+                border: "1px solid #0066CC",
                 fontSize: "0.95em",
                 color: "#000000", // Black text
                 backgroundColor: "#FFFFFF",
                 "& .MuiChip-icon": {
-                  color: "#E30613", // Red icon
+                  color: "#0066CC", // Blue icon
                 },
                 "&:hover": {
-                  backgroundColor: "#FFF5F5",
-                  borderColor: "#B8050F",
+                  backgroundColor: "#F0F7FF",
+                  borderColor: "#004499",
                 },
               }}
               label={userName}
               variant="outlined"
               icon={<SentimentSatisfiedAltIcon />}
             />
-            <IconButton
-              onClick={() => setKbSidebarOpen(true)}
-              sx={{ 
-                ml: 1,
-                color: '#E30613',
-                '&:hover': { backgroundColor: '#FFF5F5' }
-              }}
-            >
-              <MenuBookIcon />
-            </IconButton>
+
           </Box>
         </Toolbar>
       </AppBar>

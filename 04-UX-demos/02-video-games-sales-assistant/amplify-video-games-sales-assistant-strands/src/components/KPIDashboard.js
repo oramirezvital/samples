@@ -176,7 +176,7 @@ const KPIDashboard = () => {
         height: 300,
         toolbar: { show: false }
       },
-      colors: ['#E30613', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8'],
+      colors: ['#0066CC', '#1E88E5', '#004499', '#42A5F5', '#64B5F6', '#90CAF9', '#BBDEFB', '#E3F2FD'],
       legend: {
         position: 'bottom'
       }
@@ -239,22 +239,22 @@ const KPIDashboard = () => {
 
   const KPICard = ({ title, value, loading, chartData, description }) => (
     <Paper elevation={3} sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Typography variant="h6" gutterBottom color="primary" fontWeight="bold">
+      <Typography variant="h6" gutterBottom sx={{ color: '#0066CC', fontWeight: 'bold' }}>
         {title}
       </Typography>
       
       {loading ? (
         <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
-          <CircularProgress size={40} />
+          <CircularProgress size={40} sx={{ color: '#0066CC' }} />
         </Box>
       ) : (
         <>
-          <Typography variant="h4" color="text.primary" fontWeight="bold" mb={2}>
+          <Typography variant="h4" sx={{ color: '#000000', fontWeight: 'bold', mb: 2 }}>
             {value}
           </Typography>
           
           {description && (
-            <Typography variant="body2" color="text.secondary" mb={2}>
+            <Typography variant="body2" sx={{ color: '#333333', mb: 2 }}>
               {description}
             </Typography>
           )}
@@ -277,7 +277,7 @@ const KPIDashboard = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom color="primary" fontWeight="bold" mb={4}>
+      <Typography variant="h4" gutterBottom sx={{ color: '#0066CC', fontWeight: 'bold', mb: 4 }}>
         Mobile Private Network KPIs Dashboard
       </Typography>
       
