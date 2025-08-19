@@ -13,6 +13,7 @@ import {
 import { Send as SendIcon, Close as CloseIcon } from '@mui/icons-material';
 import { BedrockAgentRuntimeClient, RetrieveAndGenerateCommand } from '@aws-sdk/client-bedrock-agent-runtime';
 import { ACCESS_KEY_ID, SECRET_ACCESS_KEY, AWS_REGION } from '../env';
+import ReactMarkdown from 'react-markdown';
 
 const KnowledgeBaseSidebar = ({ open, onClose }) => {
   const [query, setQuery] = useState('');
@@ -45,7 +46,7 @@ const KnowledgeBaseSidebar = ({ open, onClose }) => {
           type: 'KNOWLEDGE_BASE',
           knowledgeBaseConfiguration: {
             knowledgeBaseId: 'GTIT7VEQDS',
-            modelArn: 'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0',
+            modelArn: 'arn:aws:bedrock:us-east-1:366978640738:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0',
             generationConfiguration: {
               inferenceConfig: {
                 textInferenceConfig: {
@@ -176,17 +177,72 @@ const KnowledgeBaseSidebar = ({ open, onClose }) => {
                   }
                 }}
               >
-                <Typography 
-                  variant="body1" 
-                  sx={{ 
-                    whiteSpace: 'pre-wrap',
-                    lineHeight: 1.6,
-                    fontSize: '0.95rem',
-                    fontWeight: message.type === 'user' ? 500 : 400
-                  }}
-                >
-                  {message.text}
-                </Typography>
+                {message.type === 'assistant' ? (
+                  <ReactMarkdown
+                    components={{
+                      p: ({ children }) => (
+                        <Typography variant="body1" sx={{ mb: 1, lineHeight: 1.6, fontSize: '0.95rem' }}>
+                          {children}
+                        </Typography>
+                      ),
+                      h1: ({ children }) => (
+                        <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
+                          {children}
+                        </Typography>
+                      ),
+                      h2: ({ children }) => (
+                        <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
+                          {children}
+                        </Typography>
+                      ),
+                      h3: ({ children }) => (
+                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                          {children}
+                        </Typography>
+                      ),
+                      ul: ({ children }) => (
+                        <Box component="ul" sx={{ pl: 2, mb: 1 }}>
+                          {children}
+                        </Box>
+                      ),
+                      ol: ({ children }) => (
+                        <Box component="ol" sx={{ pl: 2, mb: 1 }}>
+                          {children}
+                        </Box>
+                      ),
+                      code: ({ children, inline }) => (
+                        <Box
+                          component={inline ? 'span' : 'pre'}
+                          sx={{
+                            bgcolor: 'rgba(0,0,0,0.1)',
+                            p: inline ? 0.5 : 1,
+                            borderRadius: 1,
+                            fontFamily: 'monospace',
+                            fontSize: '0.85rem',
+                            display: inline ? 'inline' : 'block',
+                            overflow: 'auto'
+                          }}
+                        >
+                          {children}
+                        </Box>
+                      )
+                    }}
+                  >
+                    {message.text}
+                  </ReactMarkdown>
+                ) : (
+                  <Typography 
+                    variant="body1" 
+                    sx={{ 
+                      whiteSpace: 'pre-wrap',
+                      lineHeight: 1.6,
+                      fontSize: '0.95rem',
+                      fontWeight: message.type === 'user' ? 500 : 400
+                    }}
+                  >
+                    {message.text}
+                  </Typography>
+                )}
                 <Typography 
                   variant="caption" 
                   sx={{ 
