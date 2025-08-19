@@ -1,5 +1,5 @@
 import React from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import GlobalStyles from "@mui/material/GlobalStyles";
@@ -9,6 +9,9 @@ import Box from "@mui/material/Box";
 import SentimentSatisfiedAltIcon from "@mui/icons-material/SentimentSatisfiedAlt";
 import AppBar from "@mui/material/AppBar";
 import Toolbar from "@mui/material/Toolbar";
+import IconButton from "@mui/material/IconButton";
+import { MenuBook as MenuBookIcon } from "@mui/icons-material";
+import KnowledgeBaseSidebar from "./KnowledgeBaseSidebar";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import "@fontsource/roboto/300.css";
@@ -24,12 +27,12 @@ import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
-import IconButton from "@mui/material/IconButton";
 import CloudOutlinedIcon from "@mui/icons-material/CloudOutlined";
 
 function LayoutApp() {
   const [userName, setUserName] = React.useState("Guest User");
   const [open, setOpen] = React.useState(false);
+  const [kbSidebarOpen, setKbSidebarOpen] = useState(false);
 
   const effectRan = React.useRef(false);
   useEffect(() => {
@@ -142,6 +145,16 @@ function LayoutApp() {
               variant="outlined"
               icon={<SentimentSatisfiedAltIcon />}
             />
+            <IconButton
+              onClick={() => setKbSidebarOpen(true)}
+              sx={{ 
+                ml: 1,
+                color: '#E30613',
+                '&:hover': { backgroundColor: '#FFF5F5' }
+              }}
+            >
+              <MenuBookIcon />
+            </IconButton>
           </Box>
         </Toolbar>
       </AppBar>
@@ -219,6 +232,11 @@ function LayoutApp() {
           <Button onClick={handleClose}>Close</Button>
         </DialogActions>
       </Dialog>
+
+      <KnowledgeBaseSidebar 
+        open={kbSidebarOpen} 
+        onClose={() => setKbSidebarOpen(false)} 
+      />
     </ThemeProvider>
   );
 }
