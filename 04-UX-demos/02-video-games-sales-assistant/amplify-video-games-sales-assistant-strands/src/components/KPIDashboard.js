@@ -42,34 +42,32 @@ const KPIDashboard = () => {
 
       // Execute essential queries for 4 main KPIs
       const [
-        networkCountResult,
         networksByClientResult,
         networkAvailabilityResult,
         averageLatencyResult,
-        ueCountResult,
         ueByTypeResult
       ] = await Promise.all([
-        executeQuery(kpiQueries.networkCount),
         executeQuery(kpiQueries.networksByClient),
         executeQuery(kpiQueries.networkAvailability),
         executeQuery(kpiQueries.averageLatency),
-        executeQuery(kpiQueries.ueCount),
         executeQuery(kpiQueries.ueByType)
       ]);
 
-      console.log('Query result for Total networks:', networkCountResult);
       console.log('Query result for Networks by client:', networksByClientResult);
       console.log('Query result for Network availability:', networkAvailabilityResult);
       console.log('Query result for Average latency:', averageLatencyResult);
-      console.log('Query result for Total devices:', ueCountResult);
       console.log('Query result for Devices by type:', ueByTypeResult);
+
+      // Calculate totals from the detailed results
+      const totalNetworks = networksByClientResult.reduce((sum, item) => sum + (item.network_count || 0), 0);
+      const totalDevices = ueByTypeResult.reduce((sum, item) => sum + (item.device_count || 0), 0);
 
       // Update state with real data
       setKpiData({
         networkOverview: {
           loading: false,
           data: formatChartData(networksByClientResult, 'enterprise_client', 'network_count'),
-          value: networkCountResult[0]?.total_networks?.toString() || '0'
+          value: totalNetworks.toString()
         },
         networkAvailability: {
           loading: false,
@@ -84,7 +82,7 @@ const KPIDashboard = () => {
         deviceCount: {
           loading: false,
           data: formatChartData(ueByTypeResult, 'device_type', 'device_count'),
-          value: ueCountResult[0]?.total_devices?.toString() || '0'
+          value: totalDevices.toString()
         }
       });
 
@@ -320,41 +318,6 @@ const KPIDashboard = () => {
             chartData={kpiData.deviceCount.data}
             description="Total user equipment across all networks"
           />
-        </Grid>
-      </Grid>
-
-      {/* Additional KPI Cards Row */}
-      <Grid container spacing={3} sx={{ mt: 2 }}>
-        <Grid item xs={12} md={6}>
-          <Paper elevation={3} sx={{ p: 3, height: 400 }}>
-            <Typography variant="h6" gutterBottom color="primary" fontWeight="bold">
-              Network Performance Trends
-            </Typography>
-            <Typography variant="body2" color="text.secondary" mb={2}>
-              Real-time monitoring of key performance indicators across all MPN networks
-            </Typography>
-            <Box display="flex" justifyContent="center" alignItems="center" height={300}>
-              <Typography variant="body1" color="text.secondary">
-                Performance trends visualization will appear here when data is available
-              </Typography>
-            </Box>
-          </Paper>
-        </Grid>
-        
-        <Grid item xs={12} md={6}>
-          <Paper elevation={3} sx={{ p: 3, height: 400 }}>
-            <Typography variant="h6" gutterBottom color="primary" fontWeight="bold">
-              SLA Compliance Status
-            </Typography>
-            <Typography variant="body2" color="text.secondary" mb={2}>
-              Service Level Agreement compliance tracking for availability, latency, and throughput
-            </Typography>
-            <Box display="flex" justifyContent="center" alignItems="center" height={300}>
-              <Typography variant="body1" color="text.secondary">
-                SLA compliance metrics will appear here when data is available
-              </Typography>
-            </Box>
-          </Paper>
         </Grid>
       </Grid>
     </Box>
