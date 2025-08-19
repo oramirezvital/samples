@@ -1,8 +1,29 @@
 import { AGENT_ENDPOINT_URL } from '../env';
 
+// Generate unique UUID
+const generateUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
+// Generate session ID (persistent for the page session)
+let sessionId = null;
+const getSessionId = () => {
+  if (!sessionId) {
+    sessionId = `kpi-session-${generateUUID()}`;
+  }
+  return sessionId;
+};
+
 // Utility function to execute SQL queries through the agent
 export const executeDirectQuery = async (sqlQuery, description = '') => {
   try {
+    const uniquePromptId = `direct-query-${generateUUID()}`;
+    const currentSessionId = getSessionId();
+    
     const response = await fetch(AGENT_ENDPOINT_URL, {
       method: 'POST',
       headers: {
@@ -11,9 +32,9 @@ export const executeDirectQuery = async (sqlQuery, description = '') => {
       body: JSON.stringify({
         bedrock_model_id: 'us.anthropic.claude-3-7-sonnet-20250219-v1:0',
         prompt: `Please execute this SQL query directly and return only the raw results: ${sqlQuery}`,
-        prompt_uuid: `direct-query-${Date.now()}`,
+        prompt_uuid: uniquePromptId,
         user_timezone: 'America/Mexico_City',
-        session_id: `kpi-${Date.now()}`
+        session_id: currentSessionId
       })
     });
 
