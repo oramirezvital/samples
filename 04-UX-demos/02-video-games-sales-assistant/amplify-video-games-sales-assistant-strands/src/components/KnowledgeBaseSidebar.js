@@ -8,9 +8,10 @@ import {
   Paper, 
   CircularProgress,
   IconButton,
-  Divider
+  Divider,
+  Chip
 } from '@mui/material';
-import { Send as SendIcon, Close as CloseIcon } from '@mui/icons-material';
+import { Send as SendIcon, Close as CloseIcon, NetworkCheck, Speed, Security, Analytics } from '@mui/icons-material';
 import { BedrockAgentRuntimeClient, RetrieveAndGenerateCommand } from '@aws-sdk/client-bedrock-agent-runtime';
 import { ACCESS_KEY_ID, SECRET_ACCESS_KEY, AWS_REGION } from '../env';
 import ReactMarkdown from 'react-markdown';
@@ -19,6 +20,34 @@ const KnowledgeBaseSidebar = ({ open, onClose }) => {
   const [query, setQuery] = useState('');
   const [conversation, setConversation] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // Sample MPN KPI queries
+  const sampleQueries = [
+    {
+      icon: <NetworkCheck />,
+      text: "What is network availability for PEMEX?",
+      category: "Availability"
+    },
+    {
+      icon: <Speed />,
+      text: "Show average latency across all networks",
+      category: "Performance"
+    },
+    {
+      icon: <Security />,
+      text: "Security incidents in the last 24 hours",
+      category: "Security"
+    },
+    {
+      icon: <Analytics />,
+      text: "SLA compliance status by network",
+      category: "SLA"
+    }
+  ];
+
+  const handleSampleQuery = (sampleText) => {
+    setQuery(sampleText);
+  };
 
   const handleQuery = async () => {
     if (!query.trim()) return;
@@ -109,7 +138,7 @@ const KnowledgeBaseSidebar = ({ open, onClose }) => {
       }}
     >
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">Claro Connect KB Chat</Typography>
+        <Typography variant="h6">MPN KPIs Knowledge Base</Typography>
         <Box>
           <Button size="small" onClick={clearConversation} sx={{ mr: 1, color: '#666' }}>
             Clear
@@ -117,6 +146,33 @@ const KnowledgeBaseSidebar = ({ open, onClose }) => {
           <IconButton onClick={onClose}>
             <CloseIcon />
           </IconButton>
+        </Box>
+      </Box>
+
+      {/* Sample Queries */}
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+          Sample MPN KPI Queries:
+        </Typography>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+          {sampleQueries.map((sample, index) => (
+            <Chip
+              key={index}
+              icon={sample.icon}
+              label={sample.text}
+              variant="outlined"
+              size="small"
+              onClick={() => handleSampleQuery(sample.text)}
+              sx={{ 
+                mb: 1,
+                '&:hover': { 
+                  backgroundColor: '#E30613', 
+                  color: 'white',
+                  '& .MuiChip-icon': { color: 'white' }
+                }
+              }}
+            />
+          ))}
         </Box>
       </Box>
 
@@ -131,9 +187,14 @@ const KnowledgeBaseSidebar = ({ open, onClose }) => {
         p: 1
       }}>
         {conversation.length === 0 ? (
-          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 4 }}>
-            Start a conversation with the knowledge base...
-          </Typography>
+          <Box sx={{ textAlign: 'center', mt: 4, p: 2 }}>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Ask questions about Mobile Private Network KPIs
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Examples: Network availability, latency metrics, security incidents, SLA compliance
+            </Typography>
+          </Box>
         ) : (
           conversation.map((message, index) => (
             <Box key={index} sx={{ mb: 3, display: 'flex', justifyContent: message.type === 'user' ? 'flex-end' : 'flex-start' }}>

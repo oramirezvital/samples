@@ -2,7 +2,7 @@
 
 const ACCESS_KEY_ID = "";
 const SECRET_ACCESS_KEY = "";
-const AWS_REGION = "us-east-1";
+const AWS_REGION = "us-east-2";
 
 // DynamoDB Table
 
@@ -10,10 +10,10 @@ const QUESTION_ANSWERS_TABLE_NAME = "";
 
 // Application Information
 
-const APP_NAME = "Data Analyst Assistant";
-const APP_SUBJECT = "Video Games Sales";
+const APP_NAME = "MPN KPIs Data Analyst Assistant";
+const APP_SUBJECT = "Mobile Private Network KPIs";
 const WELCOME_MESSAGE =
-  "I'm your Video Games Sales Data Analyst, crunching data for insights.";
+  "I'm your Mobile Private Network KPIs Data Analyst, analyzing network performance and operational metrics.";
 
 const AGENT_ENDPOINT_URL = "http://<AGENT_ENDPOINT_URL>/assistant-streaming";
 

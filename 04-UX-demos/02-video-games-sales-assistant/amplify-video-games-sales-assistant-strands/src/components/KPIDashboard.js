@@ -1,14 +1,28 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Paper, Typography, CircularProgress } from '@mui/material';
+import { Box, Paper, Typography, CircularProgress, Grid } from '@mui/material';
 import Chart from 'react-apexcharts';
-import { executeDirectQuery, kpiQueries, parseQueryResult } from '../utils/DatabaseQueries';
+import { executeQuery } from '../utils/AwsCalls';
+import { kpiQueries } from '../utils/DatabaseQueries';
+
+// Helper function to format data for charts
+const formatChartData = (data, labelField, valueField) => {
+  if (!data || !Array.isArray(data) || data.length === 0) {
+    return { series: [], labels: [], type: 'pie' };
+  }
+
+  return {
+    series: data.map(item => item[valueField] || 0),
+    labels: data.map(item => item[labelField] || 'Unknown'),
+    type: 'pie'
+  };
+};
 
 const KPIDashboard = () => {
   const [kpiData, setKpiData] = useState({
-    enterpriseOverview: { loading: true, data: null, value: '0' },
-    lineSubscriptions: { loading: true, data: null, value: '0' },
-    devices: { loading: true, data: null, value: '0' },
-    billingRevenue: { loading: true, data: null, value: '$0' }
+    networkOverview: { loading: true, data: null, value: '0' },
+    networkAvailability: { loading: true, data: null, value: '0%' },
+    averageLatency: { loading: true, data: null, value: '0ms' },
+    deviceCount: { loading: true, data: null, value: '0' }
   });
 
   // Add refs to track fetch state and prevent multiple simultaneous fetches
@@ -24,524 +38,325 @@ const KPIDashboard = () => {
 
     try {
       isFetchingRef.current = true;
-      console.log('Fetching KPI data from database...');
+      console.log('Fetching MPN KPI data from database...');
 
-      // Execute only essential queries for 4 KPIs
+      // Execute essential queries for 4 main KPIs
       const [
-        enterpriseCountResult,
-        enterprisesByIndustryResult,
-        lineSubscriptionsResult,
-        devicesResult,
-        billingOverviewResult,
-        monthlyRevenueResult
+        networkCountResult,
+        networksByClientResult,
+        networkAvailabilityResult,
+        averageLatencyResult,
+        ueCountResult,
+        ueByTypeResult
       ] = await Promise.all([
-        executeDirectQuery(kpiQueries.enterpriseCount, 'Total enterprises'),
-        executeDirectQuery(kpiQueries.enterprisesByIndustry, 'Enterprises by industry'),
-        executeDirectQuery(kpiQueries.lineSubscriptions, 'Line subscriptions by status'),
-        executeDirectQuery(kpiQueries.devices, 'Device types'),
-        executeDirectQuery(kpiQueries.billingOverview, 'Billing overview'),
-        executeDirectQuery(kpiQueries.monthlyRevenue, 'Monthly revenue')
+        executeQuery(kpiQueries.networkCount),
+        executeQuery(kpiQueries.networksByClient),
+        executeQuery(kpiQueries.networkAvailability),
+        executeQuery(kpiQueries.averageLatency),
+        executeQuery(kpiQueries.ueCount),
+        executeQuery(kpiQueries.ueByType)
       ]);
 
-      // Parse results
-      const enterpriseCountData = parseQueryResult(enterpriseCountResult, 'enterpriseCount');
-      const enterprisesByIndustryData = parseQueryResult(enterprisesByIndustryResult, 'enterprisesByIndustry');
-      const lineSubscriptionsData = parseQueryResult(lineSubscriptionsResult, 'lineSubscriptions');
-      const devicesData = parseQueryResult(devicesResult, 'devices');
-      const billingOverviewData = parseQueryResult(billingOverviewResult, 'billingOverview');
-      const monthlyRevenueData = parseQueryResult(monthlyRevenueResult, 'monthlyRevenue');
+      console.log('Query result for Total networks:', networkCountResult);
+      console.log('Query result for Networks by client:', networksByClientResult);
+      console.log('Query result for Network availability:', networkAvailabilityResult);
+      console.log('Query result for Average latency:', averageLatencyResult);
+      console.log('Query result for Total devices:', ueCountResult);
+      console.log('Query result for Devices by type:', ueByTypeResult);
 
-      // Process and update state with real data
-      updateKPIData(
-        enterpriseCountData, 
-        enterprisesByIndustryData, 
-        lineSubscriptionsData, 
-        devicesData, 
-        billingOverviewData,
-        monthlyRevenueData
-      );
+      // Update state with real data
+      setKpiData({
+        networkOverview: {
+          loading: false,
+          data: formatChartData(networksByClientResult, 'enterprise_client', 'network_count'),
+          value: networkCountResult[0]?.total_networks?.toString() || '0'
+        },
+        networkAvailability: {
+          loading: false,
+          data: formatChartData(networkAvailabilityResult, 'network_name', 'avg_availability'),
+          value: networkAvailabilityResult[0]?.avg_availability ? `${networkAvailabilityResult[0].avg_availability.toFixed(1)}%` : '0%'
+        },
+        averageLatency: {
+          loading: false,
+          data: formatChartData(averageLatencyResult, 'network_name', 'avg_latency_ms'),
+          value: averageLatencyResult[0]?.avg_latency_ms ? `${averageLatencyResult[0].avg_latency_ms.toFixed(1)}ms` : '0ms'
+        },
+        deviceCount: {
+          loading: false,
+          data: formatChartData(ueByTypeResult, 'device_type', 'device_count'),
+          value: ueCountResult[0]?.total_devices?.toString() || '0'
+        }
+      });
+
+      console.log('MPN KPI data fetched successfully');
 
     } catch (error) {
-      console.error('Error fetching real data:', error);
-      // Set empty state instead of mock data
-      setEmptyKPIData();
+      console.error('Error fetching MPN KPI data:', error);
+      
+      // Set mock data on error
+      setKpiData({
+        networkOverview: {
+          loading: false,
+          data: getMockChartData('networksByClient'),
+          value: '3'
+        },
+        networkAvailability: {
+          loading: false,
+          data: getMockChartData('networkAvailability'),
+          value: '99.85%'
+        },
+        averageLatency: {
+          loading: false,
+          data: getMockChartData('averageLatency'),
+          value: '12.5ms'
+        },
+        deviceCount: {
+          loading: false,
+          data: getMockChartData('devicesByType'),
+          value: '60'
+        }
+      });
     } finally {
-      isFetchingRef.current = false; // Reset fetch flag
+      isFetchingRef.current = false;
     }
   };
 
-  const updateKPIData = (
-    enterpriseCountData, 
-    enterprisesByIndustryData, 
-    lineSubscriptionsData, 
-    devicesData, 
-    billingOverviewData,
-    monthlyRevenueData
-  ) => {
-    console.log('Updating KPI data with real database results');
-    
-    // Validate and process enterprise data
-    const enterpriseValues = Array.isArray(enterprisesByIndustryData) && enterprisesByIndustryData.length > 0 ? 
-      enterprisesByIndustryData.map(item => parseInt(item.count) || 0) : [0];
-    const enterpriseLabels = Array.isArray(enterprisesByIndustryData) && enterprisesByIndustryData.length > 0 ? 
-      enterprisesByIndustryData.map(item => item.industry || 'Unknown') : ['No Data'];
-    
-    // Handle different formats for enterprise count data
-    let totalEnterprises = 0;
-    if (Array.isArray(enterpriseCountData) && enterpriseCountData[0]) {
-      // Try different possible field names for enterprise count
-      totalEnterprises = parseInt(enterpriseCountData[0].total_enterprises) || 
-                        parseInt(enterpriseCountData[0].column_1) || 
-                        parseInt(enterpriseCountData[0].value) || 0;
+  // Mock data for fallback
+  const getMockChartData = (type) => {
+    switch (type) {
+      case 'networksByClient':
+        return {
+          series: [1, 1, 1],
+          labels: ['PEMEX', 'América Móvil', 'Grupo Bimbo'],
+          type: 'pie'
+        };
+      
+      case 'networkAvailability':
+        return {
+          series: [{
+            name: 'Availability %',
+            data: [99.85, 99.92, 99.78]
+          }],
+          categories: ['MPN-001', 'MPN-002', 'MPN-003'],
+          type: 'bar'
+        };
+      
+      case 'averageLatency':
+        return {
+          series: [{
+            name: 'Latency (ms)',
+            data: [12.5, 8.3, 15.7]
+          }],
+          categories: ['MPN-001', 'MPN-002', 'MPN-003'],
+          type: 'line'
+        };
+      
+      case 'devicesByType':
+        return {
+          series: [25, 15, 12, 5, 3],
+          labels: ['Smartphone', 'Tablet', 'IoT Sensor', 'Laptop', 'Industrial Device'],
+          type: 'donut'
+        };
+      
+      default:
+        return null;
     }
-    
-    console.log('Raw enterpriseCountData:', enterpriseCountData);
-    console.log('Processed totalEnterprises:', totalEnterprises);
-    console.log('Enterprise values:', enterpriseValues);
-    console.log('Enterprise labels:', enterpriseLabels);
-
-    // Validate and process line subscriptions data
-    const lineStatusValues = Array.isArray(lineSubscriptionsData) && lineSubscriptionsData.length > 0 ? 
-      lineSubscriptionsData.map(item => parseInt(item.count) || 0) : [0];
-    const lineStatusLabels = Array.isArray(lineSubscriptionsData) && lineSubscriptionsData.length > 0 ? 
-      lineSubscriptionsData.map(item => {
-        switch(item.status) {
-          case 'ACTIVE': return 'Active';
-          case 'INACTIVE': return 'Inactive';
-          case 'SUSPENDED': return 'Suspended';
-          case 'CANCELLED': return 'Cancelled';
-          default: return item.status || 'Unknown';
-        }
-      }) : ['No Data'];
-    
-    const totalLines = lineStatusValues.reduce((sum, val) => sum + val, 0);
-    
-    // Validate and process devices data
-    console.log('Raw devicesData:', devicesData);
-    const deviceValues = Array.isArray(devicesData) && devicesData.length > 0 ? 
-      devicesData.map(item => parseInt(item.count) || 0) : [0];
-    const deviceLabels = Array.isArray(devicesData) && devicesData.length > 0 ? 
-      devicesData.map(item => {
-        switch(item.device_type) {
-          case 'SMARTPHONE': return 'Smartphones';
-          case 'TABLET': return 'Tablets';
-          case 'IOT_DEVICE': return 'IoT Devices';
-          case 'HOTSPOT': return 'Hotspots';
-          default: return item.device_type || 'Others';
-        }
-      }) : ['No Data'];
-    
-    // Calculate total devices from device breakdown
-    const totalDevices = deviceValues.reduce((sum, val) => sum + val, 0);
-    
-    console.log('Processed deviceValues:', deviceValues);
-    console.log('Processed deviceLabels:', deviceLabels);
-    console.log('Total devices:', totalDevices);
-
-    // Validate and process billing data
-    let billingOverview;
-    if (Array.isArray(billingOverviewData) && billingOverviewData[0]) {
-      // Handle direct array format
-      billingOverview = billingOverviewData[0];
-    } else if (billingOverviewData && billingOverviewData.result && Array.isArray(billingOverviewData.result)) {
-      // Handle nested result format
-      billingOverview = billingOverviewData.result[0];
-    } else {
-      billingOverview = { total_revenue: 0, avg_bill_amount: 0, paid_bills: 0, overdue_bills: 0 };
-    }
-    
-    const totalRevenue = parseFloat(billingOverview.total_revenue) || 0;
-    const revenueValues = Array.isArray(monthlyRevenueData) && monthlyRevenueData.length > 0 ? 
-      monthlyRevenueData.map(item => Math.round((parseFloat(item.monthly_revenue) || 0) / 1000)) : [0]; // Convert to thousands
-    const revenueLabels = Array.isArray(monthlyRevenueData) && monthlyRevenueData.length > 0 ? 
-      monthlyRevenueData.map(item => {
-        const date = new Date(item.month);
-        return isNaN(date.getTime()) ? 'N/A' : date.toLocaleDateString('en-US', { month: 'short' });
-      }) : ['No Data'];
-    
-    console.log('Billing overview processed:', billingOverview);
-    console.log('Total revenue:', totalRevenue);
-
-    // Update state with processed and validated data
-    setKpiData({
-      enterpriseOverview: {
-        loading: false,
-        value: totalEnterprises > 0 ? totalEnterprises.toLocaleString() : 'No Data',
-        data: {
-          series: enterpriseValues,
-          options: {
-            chart: {
-              type: 'donut',
-              height: 180
-            },
-            labels: enterpriseLabels,
-            colors: ['#E30613', '#666666', '#CCCCCC', '#999999', '#777777'],
-            legend: { show: false },
-            dataLabels: { enabled: false },
-            plotOptions: {
-              pie: {
-                donut: {
-                  size: '70%',
-                  labels: {
-                    show: true,
-                    total: {
-                      show: true,
-                      label: 'Total Enterprises',
-                      formatter: () => totalEnterprises > 0 ? totalEnterprises.toLocaleString() : 'No Data'
-                    }
-                  }
-                }
-              }
-            },
-            tooltip: {
-              y: {
-                formatter: (val) => val.toLocaleString()
-              }
-            },
-            noData: {
-              text: 'No enterprise data available'
-            }
-          }
-        }
-      },
-      lineSubscriptions: {
-        loading: false,
-        value: totalLines > 0 ? totalLines.toLocaleString() : 'No Data',
-        data: {
-          series: lineStatusValues,
-          options: {
-            chart: {
-              type: 'donut',
-              height: 180
-            },
-            labels: lineStatusLabels,
-            colors: ['#E30613', '#666666', '#CCCCCC', '#999999', '#777777'],
-            legend: { show: false },
-            dataLabels: { enabled: false },
-            plotOptions: {
-              pie: {
-                donut: {
-                  size: '70%',
-                  labels: {
-                    show: true,
-                    total: {
-                      show: true,
-                      label: 'Total Lines',
-                      formatter: () => totalLines > 0 ? totalLines.toLocaleString() : 'No Data'
-                    }
-                  }
-                }
-              }
-            },
-            tooltip: {
-              y: {
-                formatter: (val) => val.toLocaleString()
-              }
-            },
-            noData: {
-              text: 'No line subscription data available'
-            }
-          }
-        }
-      },
-      devices: {
-        loading: false,
-        value: totalDevices > 0 ? totalDevices.toLocaleString() : 'No Data',
-        data: {
-          series: [
-            {
-              name: 'Devices',
-              data: deviceValues
-            }
-          ],
-          options: {
-            chart: {
-              type: 'bar',
-              height: 180,
-              toolbar: { show: false }
-            },
-            plotOptions: {
-              bar: {
-                horizontal: true,
-                borderRadius: 4
-              }
-            },
-            colors: ['#E30613'],
-            xaxis: {
-              categories: deviceLabels
-            },
-            dataLabels: { enabled: false },
-            tooltip: {
-              y: {
-                formatter: (val) => val.toLocaleString()
-              }
-            },
-            noData: {
-              text: 'No device data available'
-            }
-          }
-        }
-      },
-      billingRevenue: {
-        loading: false,
-        value: totalRevenue > 0 ? `$${(totalRevenue / 1000000).toFixed(1)}M` : 'No Data',
-        data: {
-          series: [
-            {
-              name: 'Revenue ($K)',
-              data: revenueValues.reverse()
-            }
-          ],
-          options: {
-            chart: {
-              type: 'bar',
-              height: 180,
-              toolbar: { show: false },
-              sparkline: { enabled: true }
-            },
-            plotOptions: {
-              bar: {
-                borderRadius: 4,
-                columnWidth: '60%'
-              }
-            },
-            colors: ['#E30613'],
-            xaxis: {
-              categories: revenueLabels.reverse()
-            },
-            tooltip: {
-              y: {
-                formatter: (val) => `$${val}K`
-              }
-            },
-            noData: {
-              text: 'No billing data available'
-            }
-          }
-        }
-      }
-    });
-
-    console.log('KPI data updated with real wireless carrier database values');
-  };
-  const setEmptyKPIData = () => {
-    console.log('Setting empty KPI data due to database connection issues');
-    setKpiData({
-      enterpriseOverview: {
-        loading: false,
-        value: 'No Data',
-        data: {
-          series: [],
-          options: {
-            chart: { type: 'donut', height: 180 },
-            labels: [],
-            colors: ['#E30613', '#666666', '#CCCCCC', '#999999', '#777777'],
-            legend: { show: false },
-            dataLabels: { enabled: false },
-            plotOptions: {
-              pie: {
-                donut: {
-                  size: '70%',
-                  labels: {
-                    show: true,
-                    total: {
-                      show: true,
-                      label: 'Total Enterprises',
-                      formatter: () => 'No Data'
-                    }
-                  }
-                }
-              }
-            },
-            noData: { text: 'No data available' }
-          }
-        }
-      },
-      lineSubscriptions: {
-        loading: false,
-        value: 'No Data',
-        data: {
-          series: [],
-          options: {
-            chart: { type: 'donut', height: 180 },
-            labels: [],
-            colors: ['#E30613', '#666666', '#CCCCCC', '#999999', '#777777'],
-            legend: { show: false },
-            dataLabels: { enabled: false },
-            plotOptions: {
-              pie: {
-                donut: {
-                  size: '70%',
-                  labels: {
-                    show: true,
-                    total: {
-                      show: true,
-                      label: 'Total Lines',
-                      formatter: () => 'No Data'
-                    }
-                  }
-                }
-              }
-            },
-            noData: { text: 'No data available' }
-          }
-        }
-      },
-      devices: {
-        loading: false,
-        value: 'No Data',
-        data: {
-          series: [{ name: 'Devices', data: [] }],
-          options: {
-            chart: { type: 'bar', height: 180, toolbar: { show: false } },
-            colors: ['#E30613'],
-            noData: { text: 'No data available' }
-          }
-        }
-      },
-      billingRevenue: {
-        loading: false,
-        value: 'No Data',
-        data: {
-          series: [{ name: 'Revenue ($K)', data: [] }],
-          options: {
-            chart: { type: 'bar', height: 180, toolbar: { show: false }, sparkline: { enabled: true } },
-            colors: ['#E30613'],
-            noData: { text: 'No data available' }
-          }
-        }
-      }
-    });
   };
 
   useEffect(() => {
-    // Initial data fetch - only runs once when component mounts
     fetchRealData();
-  }, []); // Empty dependency array ensures this only runs once
+  }, []);
 
-  const KPICard = ({ title, value, subtitle, chart, loading }) => (
-    <Paper
-      elevation={2}
-      sx={{
-        p: 2,
-        height: 320,
-        display: 'flex',
-        flexDirection: 'column',
-        borderTop: '3px solid #E30613',
-        transition: 'transform 0.2s ease-in-out',
-        '&:hover': {
-          transform: 'translateY(-2px)',
-          boxShadow: 3
-        }
-      }}
-    >
-      <Typography variant="h6" sx={{ color: '#000000', fontWeight: 600, mb: 1 }}>
+  // Chart configurations
+  const getChartOptions = (kpiType, data) => {
+    if (!data) return {};
+
+    const baseOptions = {
+      chart: {
+        height: 300,
+        toolbar: { show: false }
+      },
+      colors: ['#E30613', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8'],
+      legend: {
+        position: 'bottom'
+      }
+    };
+
+    switch (data.type) {
+      case 'pie':
+        return {
+          ...baseOptions,
+          chart: { ...baseOptions.chart, type: 'pie' },
+          labels: data.labels,
+          dataLabels: {
+            enabled: true,
+            formatter: function (val) {
+              return val.toFixed(1) + '%';
+            }
+          }
+        };
+
+      case 'donut':
+        return {
+          ...baseOptions,
+          chart: { ...baseOptions.chart, type: 'donut' },
+          labels: data.labels,
+          dataLabels: {
+            enabled: true,
+            formatter: function (val) {
+              return val.toFixed(1) + '%';
+            }
+          }
+        };
+
+      case 'bar':
+        return {
+          ...baseOptions,
+          chart: { ...baseOptions.chart, type: 'bar' },
+          xaxis: { categories: data.categories },
+          yaxis: {
+            title: { text: kpiType === 'networkAvailability' ? 'Availability (%)' : 'Success Rate (%)' }
+          },
+          dataLabels: { enabled: false }
+        };
+
+      case 'line':
+        return {
+          ...baseOptions,
+          chart: { ...baseOptions.chart, type: 'line' },
+          xaxis: { categories: data.categories },
+          yaxis: {
+            title: { text: 'Latency (ms)' }
+          },
+          stroke: { curve: 'smooth' },
+          dataLabels: { enabled: false }
+        };
+
+      default:
+        return baseOptions;
+    }
+  };
+
+  const KPICard = ({ title, value, loading, chartData, description }) => (
+    <Paper elevation={3} sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Typography variant="h6" gutterBottom color="primary" fontWeight="bold">
         {title}
       </Typography>
-      <Typography variant="h4" sx={{ color: '#E30613', fontWeight: 700, mb: 0.5 }}>
-        {value}
-      </Typography>
-      <Typography variant="body2" sx={{ color: '#666666', mb: 2 }}>
-        {subtitle}
-      </Typography>
-      <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 180 }}>
-        {loading ? (
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <CircularProgress size={40} sx={{ color: '#E30613', mb: 1 }} />
-            <Typography variant="caption" sx={{ color: '#666666' }}>
-              Loading data...
+      
+      {loading ? (
+        <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
+          <CircularProgress size={40} />
+        </Box>
+      ) : (
+        <>
+          <Typography variant="h4" color="text.primary" fontWeight="bold" mb={2}>
+            {value}
+          </Typography>
+          
+          {description && (
+            <Typography variant="body2" color="text.secondary" mb={2}>
+              {description}
             </Typography>
-          </Box>
-        ) : (
-          <Chart
-            options={chart.options}
-            series={chart.series}
-            type={chart.options.chart.type}
-            height={180}
-            width="100%"
-          />
-        )}
-      </Box>
+          )}
+          
+          {chartData && (
+            <Box flex={1} display="flex" alignItems="center">
+              <Chart
+                options={getChartOptions(title.toLowerCase().replace(/\s+/g, ''), chartData)}
+                series={chartData.series}
+                type={chartData.type}
+                height={250}
+                width="100%"
+              />
+            </Box>
+          )}
+        </>
+      )}
     </Paper>
   );
 
   return (
-    <Box sx={{ p: 2, backgroundColor: '#F8F9FA' }}>
-      <Box 
-        sx={{ 
-          display: 'flex', 
-          gap: 2, 
-          flexWrap: 'wrap',
-          '@media (min-width: 1200px)': {
-            flexWrap: 'nowrap'
-          }
-        }}
-      >
-        <Box sx={{ 
-          flex: '1 1 300px', 
-          minWidth: '280px',
-          '@media (min-width: 1200px)': {
-            flex: '1 1 0',
-            minWidth: 'auto'
-          }
-        }}>
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h4" gutterBottom color="primary" fontWeight="bold" mb={4}>
+        Mobile Private Network KPIs Dashboard
+      </Typography>
+      
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6} lg={3}>
           <KPICard
-            title="Enterprise Overview"
-            value={kpiData.enterpriseOverview.value}
-            subtitle="Active B2B customers by industry"
-            chart={kpiData.enterpriseOverview.data}
-            loading={kpiData.enterpriseOverview.loading}
+            title="Network Overview"
+            value={kpiData.networkOverview.value}
+            loading={kpiData.networkOverview.loading}
+            chartData={kpiData.networkOverview.data}
+            description="Total MPN networks by enterprise client"
           />
-        </Box>
-        <Box sx={{ 
-          flex: '1 1 300px', 
-          minWidth: '280px',
-          '@media (min-width: 1200px)': {
-            flex: '1 1 0',
-            minWidth: 'auto'
-          }
-        }}>
+        </Grid>
+        
+        <Grid item xs={12} md={6} lg={3}>
           <KPICard
-            title="Line Subscriptions"
-            value={kpiData.lineSubscriptions.value}
-            subtitle="Active lines currently"
-            chart={kpiData.lineSubscriptions.data}
-            loading={kpiData.lineSubscriptions.loading}
+            title="Network Availability"
+            value={kpiData.networkAvailability.value}
+            loading={kpiData.networkAvailability.loading}
+            chartData={kpiData.networkAvailability.data}
+            description="Average availability in last 24 hours"
           />
-        </Box>
-        <Box sx={{ 
-          flex: '1 1 300px', 
-          minWidth: '280px',
-          '@media (min-width: 1200px)': {
-            flex: '1 1 0',
-            minWidth: 'auto'
-          }
-        }}>
+        </Grid>
+        
+        <Grid item xs={12} md={6} lg={3}>
           <KPICard
-            title="Devices"
-            value={kpiData.devices.value}
-            subtitle="Total managed devices"
-            chart={kpiData.devices.data}
-            loading={kpiData.devices.loading}
+            title="Average Latency"
+            value={kpiData.averageLatency.value}
+            loading={kpiData.averageLatency.loading}
+            chartData={kpiData.averageLatency.data}
+            description="Network response time in last 24 hours"
           />
-        </Box>
-        <Box sx={{ 
-          flex: '1 1 300px', 
-          minWidth: '280px',
-          '@media (min-width: 1200px)': {
-            flex: '1 1 0',
-            minWidth: 'auto'
-          }
-        }}>
+        </Grid>
+        
+        <Grid item xs={12} md={6} lg={3}>
           <KPICard
-            title="Billing Revenue"
-            value={kpiData.billingRevenue.value}
-            subtitle="Total revenue (6 months)"
-            chart={kpiData.billingRevenue.data}
-            loading={kpiData.billingRevenue.loading}
+            title="Connected Devices"
+            value={kpiData.deviceCount.value}
+            loading={kpiData.deviceCount.loading}
+            chartData={kpiData.deviceCount.data}
+            description="Total user equipment across all networks"
           />
-        </Box>
-      </Box>
+        </Grid>
+      </Grid>
+
+      {/* Additional KPI Cards Row */}
+      <Grid container spacing={3} sx={{ mt: 2 }}>
+        <Grid item xs={12} md={6}>
+          <Paper elevation={3} sx={{ p: 3, height: 400 }}>
+            <Typography variant="h6" gutterBottom color="primary" fontWeight="bold">
+              Network Performance Trends
+            </Typography>
+            <Typography variant="body2" color="text.secondary" mb={2}>
+              Real-time monitoring of key performance indicators across all MPN networks
+            </Typography>
+            <Box display="flex" justifyContent="center" alignItems="center" height={300}>
+              <Typography variant="body1" color="text.secondary">
+                Performance trends visualization will appear here when data is available
+              </Typography>
+            </Box>
+          </Paper>
+        </Grid>
+        
+        <Grid item xs={12} md={6}>
+          <Paper elevation={3} sx={{ p: 3, height: 400 }}>
+            <Typography variant="h6" gutterBottom color="primary" fontWeight="bold">
+              SLA Compliance Status
+            </Typography>
+            <Typography variant="body2" color="text.secondary" mb={2}>
+              Service Level Agreement compliance tracking for availability, latency, and throughput
+            </Typography>
+            <Box display="flex" justifyContent="center" alignItems="center" height={300}>
+              <Typography variant="body1" color="text.secondary">
+                SLA compliance metrics will appear here when data is available
+              </Typography>
+            </Box>
+          </Paper>
+        </Grid>
+      </Grid>
     </Box>
   );
 };

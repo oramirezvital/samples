@@ -11,7 +11,7 @@ import AppBar from "@mui/material/AppBar";
 import Toolbar from "@mui/material/Toolbar";
 import IconButton from "@mui/material/IconButton";
 import { MenuBook as MenuBookIcon } from "@mui/icons-material";
-import KnowledgeBaseSidebar from "./KnowledgeBaseSidebar";
+
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import "@fontsource/roboto/300.css";
@@ -233,10 +233,7 @@ function LayoutApp() {
         </DialogActions>
       </Dialog>
 
-      <KnowledgeBaseSidebar 
-        open={kbSidebarOpen} 
-        onClose={() => setKbSidebarOpen(false)} 
-      />
+
     </ThemeProvider>
   );
 }

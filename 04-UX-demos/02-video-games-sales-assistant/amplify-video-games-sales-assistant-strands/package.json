@@ -1,6 +1,7 @@
 {
-  "name": "amplify-video-games-sales-assistant-strands",
+  "name": "amplify-mpn-kpis-analyst-assistant-strands",
   "version": "0.1.1",
+  "description": "Mobile Private Network KPIs Data Analyst Assistant UI",
   "author": "Uriel Ramirez (beralfon@amazon.com)",
   "private": true,
   "dependencies": {

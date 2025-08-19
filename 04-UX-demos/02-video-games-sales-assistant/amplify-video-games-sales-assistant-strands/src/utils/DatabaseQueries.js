@@ -1,487 +1,355 @@
-import { AGENT_ENDPOINT_URL } from '../env';
+import { executeQuery } from './AwsCalls';
 
-// Generate unique UUID
-const generateUUID = () => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
+// KPI Queries for Mobile Private Network (MPN) metrics
+export const kpiQueries = {
+  // Network overview
+  networkCount: `
+    SELECT COUNT(*) as total_networks
+    FROM networks
+  `,
+  
+  networksByClient: `
+    SELECT enterprise_client, COUNT(*) as network_count
+    FROM networks
+    GROUP BY enterprise_client
+    ORDER BY network_count DESC
+    LIMIT 10
+  `,
+  
+  // Cell infrastructure
+  cellCount: `
+    SELECT COUNT(*) as total_cells
+    FROM cells
+  `,
+  
+  cellsByNetwork: `
+    SELECT n.network_name, COUNT(c.cell_id) as cell_count
+    FROM networks n
+    LEFT JOIN cells c ON n.network_id = c.network_id
+    GROUP BY n.network_id, n.network_name
+    ORDER BY cell_count DESC
+    LIMIT 10
+  `,
+  
+  // User equipment
+  ueCount: `
+    SELECT COUNT(*) as total_devices
+    FROM user_equipment
+  `,
+  
+  ueByType: `
+    SELECT device_type, COUNT(*) as device_count
+    FROM user_equipment
+    GROUP BY device_type
+    ORDER BY device_count DESC
+  `,
+  
+  // Network availability (last 24 hours)
+  networkAvailability: `
+    SELECT 
+      n.network_name,
+      AVG(am.availability_percentage) as avg_availability
+    FROM networks n
+    JOIN availability_metrics am ON n.network_id = am.network_id
+    WHERE am.timestamp >= NOW() - INTERVAL '24 hours'
+    GROUP BY n.network_id, n.network_name
+    ORDER BY avg_availability DESC
+    LIMIT 10
+  `,
+  
+  // Average latency (last 24 hours)
+  averageLatency: `
+    SELECT 
+      n.network_name,
+      AVG(lm.rtt_ms) as avg_latency_ms
+    FROM networks n
+    JOIN latency_metrics lm ON n.network_id = lm.network_id
+    WHERE lm.timestamp >= NOW() - INTERVAL '24 hours'
+    GROUP BY n.network_id, n.network_name
+    ORDER BY avg_latency_ms ASC
+    LIMIT 10
+  `,
+  
+  // Throughput performance (last 24 hours)
+  averageThroughput: `
+    SELECT 
+      n.network_name,
+      AVG(tm.downlink_mbps) as avg_downlink_mbps,
+      AVG(tm.uplink_mbps) as avg_uplink_mbps
+    FROM networks n
+    JOIN throughput_metrics tm ON n.network_id = tm.network_id
+    WHERE tm.timestamp >= NOW() - INTERVAL '24 hours'
+    GROUP BY n.network_id, n.network_name
+    ORDER BY avg_downlink_mbps DESC
+    LIMIT 10
+  `,
+  
+  // Packet loss (last 24 hours)
+  packetLoss: `
+    SELECT 
+      n.network_name,
+      AVG(plm.loss_percentage) as avg_packet_loss
+    FROM networks n
+    JOIN packet_loss_metrics plm ON n.network_id = plm.network_id
+    WHERE plm.timestamp >= NOW() - INTERVAL '24 hours'
+    GROUP BY n.network_id, n.network_name
+    ORDER BY avg_packet_loss ASC
+    LIMIT 10
+  `,
+  
+  // Handover success rate (last 24 hours)
+  handoverSuccess: `
+    SELECT 
+      n.network_name,
+      COUNT(*) as total_handovers,
+      SUM(CASE WHEN hm.handover_successful THEN 1 ELSE 0 END) as successful_handovers,
+      ROUND(
+        (SUM(CASE WHEN hm.handover_successful THEN 1 ELSE 0 END)::DECIMAL / COUNT(*)) * 100, 2
+      ) as success_rate_percentage
+    FROM networks n
+    JOIN handover_metrics hm ON n.network_id = hm.network_id
+    WHERE hm.timestamp >= NOW() - INTERVAL '24 hours'
+    GROUP BY n.network_id, n.network_name
+    HAVING COUNT(*) > 0
+    ORDER BY success_rate_percentage DESC
+    LIMIT 10
+  `,
+  
+  // Security incidents (last 24 hours)
+  securityMetrics: `
+    SELECT 
+      n.network_name,
+      SUM(sm.authentication_failures) as total_auth_failures,
+      SUM(sm.unauthorized_access_attempts) as total_unauthorized_attempts,
+      SUM(sm.encryption_failures) as total_encryption_failures
+    FROM networks n
+    JOIN security_metrics sm ON n.network_id = sm.network_id
+    WHERE sm.timestamp >= NOW() - INTERVAL '24 hours'
+    GROUP BY n.network_id, n.network_name
+    ORDER BY total_auth_failures DESC
+    LIMIT 10
+  `,
+  
+  // SLA compliance (last 24 hours)
+  slaCompliance: `
+    SELECT 
+      n.network_name,
+      sm.sla_type,
+      COUNT(*) as total_measurements,
+      SUM(CASE WHEN sm.compliance_status THEN 1 ELSE 0 END) as compliant_measurements,
+      ROUND(
+        (SUM(CASE WHEN sm.compliance_status THEN 1 ELSE 0 END)::DECIMAL / COUNT(*)) * 100, 2
+      ) as compliance_percentage
+    FROM networks n
+    JOIN sla_metrics sm ON n.network_id = sm.network_id
+    WHERE sm.timestamp >= NOW() - INTERVAL '24 hours'
+    GROUP BY n.network_id, n.network_name, sm.sla_type
+    ORDER BY n.network_name, sm.sla_type
+  `,
+  
+  // Network slice performance (last 24 hours)
+  slicePerformance: `
+    SELECT 
+      n.network_name,
+      sm.slice_type,
+      AVG(sm.used_bandwidth_mbps) as avg_used_bandwidth,
+      AVG(sm.actual_latency_ms) as avg_latency,
+      AVG(sm.active_ues) as avg_active_ues
+    FROM networks n
+    JOIN slice_metrics sm ON n.network_id = sm.network_id
+    WHERE sm.timestamp >= NOW() - INTERVAL '24 hours'
+    GROUP BY n.network_id, n.network_name, sm.slice_type
+    ORDER BY n.network_name, sm.slice_type
+  `,
+  
+  // Resource utilization (last 24 hours)
+  resourceUtilization: `
+    SELECT 
+      n.network_name,
+      AVG(rum.cpu_utilization_percentage) as avg_cpu_utilization,
+      AVG(rum.memory_utilization_percentage) as avg_memory_utilization,
+      AVG(rum.spectrum_utilization_percentage) as avg_spectrum_utilization
+    FROM networks n
+    JOIN resource_utilization_metrics rum ON n.network_id = rum.network_id
+    WHERE rum.timestamp >= NOW() - INTERVAL '24 hours'
+    GROUP BY n.network_id, n.network_name
+    ORDER BY avg_cpu_utilization DESC
+    LIMIT 10
+  `,
+  
+  // Quality of Experience (last 24 hours)
+  qualityOfExperience: `
+    SELECT 
+      n.network_name,
+      qm.application_type,
+      AVG(qm.mos_score) as avg_mos_score,
+      COUNT(*) as total_sessions
+    FROM networks n
+    JOIN qoe_metrics qm ON n.network_id = qm.network_id
+    WHERE qm.timestamp >= NOW() - INTERVAL '24 hours'
+    GROUP BY n.network_id, n.network_name, qm.application_type
+    ORDER BY n.network_name, avg_mos_score DESC
+  `,
+  
+  // Energy efficiency (last 24 hours)
+  energyEfficiency: `
+    SELECT 
+      n.network_name,
+      AVG(em.power_consumption_watts) as avg_power_consumption,
+      AVG(em.renewable_energy_percentage) as avg_renewable_percentage
+    FROM networks n
+    JOIN energy_metrics em ON n.network_id = em.network_id
+    WHERE em.timestamp >= NOW() - INTERVAL '24 hours'
+    GROUP BY n.network_id, n.network_name
+    ORDER BY avg_power_consumption ASC
+    LIMIT 10
+  `
 };
 
-// Generate session ID (persistent for the page session)
-let sessionId = null;
-const getSessionId = () => {
-  if (!sessionId) {
-    sessionId = `kpi-session-${generateUUID()}`;
-  }
-  return sessionId;
-};
-
-// Utility function to execute SQL queries through the agent
-export const executeDirectQuery = async (sqlQuery, description = '') => {
+// Execute direct query function
+export const executeDirectQuery = async (query, description = '') => {
   try {
-    const uniquePromptId = `direct-query-${generateUUID()}`;
-    const currentSessionId = getSessionId();
-    
-    const response = await fetch(AGENT_ENDPOINT_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        bedrock_model_id: 'us.anthropic.claude-3-7-sonnet-20250219-v1:0',
-        prompt: `Please execute this SQL query directly and return only the raw results: ${sqlQuery}`,
-        prompt_uuid: uniquePromptId,
-        user_timezone: 'America/Mexico_City',
-        session_id: currentSessionId
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    // Read the streaming response
-    const reader = response.body.getReader();
-    let result = '';
-    
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      result += new TextDecoder().decode(value);
-    }
-
+    console.log(`Executing query: ${description}`);
+    const result = await executeQuery(query);
+    console.log(`Query result for ${description}:`, result);
     return result;
   } catch (error) {
-    console.error('Error executing direct query:', error);
+    console.error(`Error executing query ${description}:`, error);
     throw error;
   }
 };
 
-// KPI-specific queries for wireless carrier data model
-export const kpiQueries = {
-  dailyUsage: `
-    SELECT 
-      DATE(usage_date) as date,
-      ROUND(SUM(data_mb + data_mb_roaming) / 1024.0, 2) as total_gb
-    FROM daily_usage 
-    WHERE usage_date >= CURRENT_DATE - INTERVAL '7 days'
-    GROUP BY DATE(usage_date)
-    ORDER BY date DESC
-    LIMIT 7;
-  `,
-  
-  enterpriseCount: `
-    SELECT COUNT(*) as total_enterprises
-    FROM enterprises 
-    WHERE status = 'ACTIVE';
-  `,
-  
-  enterprisesByIndustry: `
-    SELECT 
-      industry,
-      COUNT(*) as count
-    FROM enterprises 
-    WHERE status = 'ACTIVE'
-    GROUP BY industry
-    ORDER BY count DESC
-    LIMIT 5;
-  `,
-  
-  lineSubscriptions: `
-    SELECT 
-      status,
-      COUNT(*) as count
-    FROM lines 
-    GROUP BY status
-    ORDER BY count DESC;
-  `,
-  
-  lineSubscriptionsTrend: `
-    SELECT 
-      DATE(activation_date) as date,
-      COUNT(*) as daily_activations,
-      SUM(COUNT(*)) OVER (ORDER BY DATE(activation_date)) as cumulative_lines
-    FROM lines 
-    WHERE status = 'ACTIVE' 
-      AND activation_date >= CURRENT_DATE - INTERVAL '7 days'
-    GROUP BY DATE(activation_date)
-    ORDER BY date ASC
-    LIMIT 7;
-  `,
-  
-  devices: `
-    SELECT 
-      device_type,
-      COUNT(*) as count
-    FROM devices 
-    WHERE status IN ('ACTIVE', 'INACTIVE')
-    GROUP BY device_type
-    ORDER BY count DESC;
-  `,
-  
-  totalDevices: `
-    SELECT COUNT(*) as total_devices
-    FROM devices 
-    WHERE status IN ('ACTIVE', 'INACTIVE');
-  `,
-  
-  todayUsage: `
-    SELECT 
-      ROUND(SUM(data_mb + data_mb_roaming) / 1024.0 / 1024.0, 2) as total_tb
-    FROM daily_usage 
-    WHERE usage_date = CURRENT_DATE;
-  `,
-  
-  usageTotals: `
-    SELECT 
-      ROUND(SUM(data_mb + data_mb_roaming) / 1024.0, 2) as total_data_gb,
-      ROUND(SUM(voice_minutes + voice_minutes_roaming), 0) as total_voice_minutes,
-      SUM(sms_count + sms_count_roaming) as total_sms_count
-    FROM daily_usage 
-    WHERE usage_date >= CURRENT_DATE - INTERVAL '30 days';
-  `,
-  
-  usageTotalsDaily: `
-    SELECT 
-      DATE(usage_date) as date,
-      ROUND(SUM(data_mb + data_mb_roaming) / 1024.0, 2) as daily_data_gb,
-      ROUND(SUM(voice_minutes + voice_minutes_roaming), 0) as daily_voice_minutes,
-      SUM(sms_count + sms_count_roaming) as daily_sms_count
-    FROM daily_usage 
-    WHERE usage_date >= CURRENT_DATE - INTERVAL '7 days'
-    GROUP BY DATE(usage_date)
-    ORDER BY date DESC
-    LIMIT 7;
-  `,
-  
-  billingOverview: `
-    SELECT 
-      COUNT(*) as total_bills,
-      SUM(total_amount) as total_revenue,
-      AVG(total_amount) as avg_bill_amount,
-      COUNT(CASE WHEN status = 'PAID' THEN 1 END) as paid_bills,
-      COUNT(CASE WHEN status = 'OVERDUE' THEN 1 END) as overdue_bills
-    FROM bills 
-    WHERE billing_period_start >= CURRENT_DATE - INTERVAL '6 months';
-  `,
-  
-  monthlyRevenue: `
-    SELECT 
-      DATE_TRUNC('month', billing_period_start) as month,
-      SUM(total_amount) as monthly_revenue
-    FROM bills 
-    WHERE billing_period_start >= CURRENT_DATE - INTERVAL '6 months'
-    GROUP BY DATE_TRUNC('month', billing_period_start)
-    ORDER BY month DESC
-    LIMIT 6;
-  `
-};
-
-// Parse query results from actual database responses
-export const parseQueryResult = (result, queryType) => {
-  try {
-    console.log(`Parsing ${queryType} result:`, result);
-    
-    // First, try to extract JSON from the response
-    let parsedData = extractJSONFromResponse(result);
-    if (parsedData) {
-      console.log(`Successfully parsed JSON for ${queryType}:`, parsedData);
-      return Array.isArray(parsedData) ? parsedData : [parsedData];
-    }
-    
-    // If no JSON found, parse as table format
-    console.log(`No JSON found for ${queryType}, trying table parsing...`);
-    const tableResult = parseTableResponse(result, queryType);
-    console.log(`Table parsing result for ${queryType}:`, tableResult);
-    return tableResult;
-    
-  } catch (error) {
-    console.error(`Error parsing ${queryType} query result:`, error);
-    return [];
+// Parse query results for different KPI types
+export const parseQueryResult = (result, type) => {
+  if (!result || !result.data || result.data.length === 0) {
+    console.warn(`No data found for ${type}`);
+    return { value: '0', chartData: null };
   }
-};
 
-// Helper function to extract JSON from various response formats
-const extractJSONFromResponse = (result) => {
-  try {
-    // Look for JSON wrapped in code blocks
-    const codeBlockMatch = result.match(/```(?:json)?\s*(\[.*?\]|\{.*?\})\s*```/s);
-    if (codeBlockMatch) {
-      return JSON.parse(codeBlockMatch[1]);
-    }
-    
-    // Look for JSON arrays or objects in the text
-    const jsonArrayMatch = result.match(/\[[\s\S]*?\]/);
-    if (jsonArrayMatch) {
-      return JSON.parse(jsonArrayMatch[0]);
-    }
-    
-    const jsonObjectMatch = result.match(/\{[\s\S]*?\}/);
-    if (jsonObjectMatch) {
-      return JSON.parse(jsonObjectMatch[0]);
-    }
-    
-    // Look for multiple JSON objects on separate lines
-    const lines = result.split('\n');
-    const jsonObjects = [];
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-        try {
-          jsonObjects.push(JSON.parse(trimmed));
-        } catch (e) {
-          // Skip invalid JSON lines
-        }
-      }
-    }
-    if (jsonObjects.length > 0) {
-      return jsonObjects;
-    }
-    
-    return null;
-  } catch (error) {
-    return null;
-  }
-};
+  const data = result.data;
 
-// Helper function to parse table-formatted responses
-const parseTableResponse = (result, queryType) => {
-  try {
-    const lines = result.split('\n').map(line => line.trim()).filter(line => line);
-    
-    // Find table data (lines with | separators or data rows)
-    let dataLines = [];
-    let headerLine = null;
-    let inTable = false;
-    
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      
-      // Skip SQL queries, explanatory text, and markdown
-      if (line.includes('SELECT') || line.includes('FROM') || line.includes('WHERE') || 
-          line.includes('I\'ll execute') || line.includes('Query to') || 
-          line.includes('Raw results') || line.includes('Getting') ||
-          line.includes('Counting') || line.includes('Executing') ||
-          line.startsWith('```')) {
-        continue;
-      }
-      
-      // Look for table separator lines (like ------------)
-      if (line.match(/^[-|]+$/)) {
-        inTable = true;
-        continue;
-      }
-      
-      // Look for table headers or data with | separators
-      if (line.includes('|')) {
-        const cells = line.split('|').map(cell => cell.trim()).filter(cell => cell);
-        if (cells.length > 0) {
-          if (!headerLine && cells.some(cell => 
-            cell.includes('_') || cell.toLowerCase().includes('date') || 
-            cell.toLowerCase().includes('count') || cell.toLowerCase().includes('total') ||
-            cell.toLowerCase().includes('industry') || cell.toLowerCase().includes('device')
-          )) {
-            headerLine = cells;
-          } else if (headerLine || inTable) {
-            dataLines.push(cells);
-          }
+  switch (type) {
+    case 'networkCount':
+      return {
+        value: data[0]?.total_networks?.toString() || '0',
+        chartData: null
+      };
+
+    case 'cellCount':
+      return {
+        value: data[0]?.total_cells?.toString() || '0',
+        chartData: null
+      };
+
+    case 'ueCount':
+      return {
+        value: data[0]?.total_devices?.toString() || '0',
+        chartData: null
+      };
+
+    case 'networksByClient':
+      return {
+        value: data.length.toString(),
+        chartData: {
+          series: data.map(item => item.network_count),
+          labels: data.map(item => item.enterprise_client),
+          type: 'pie'
         }
-      } 
-      // Look for single column data (like the total_active_lines example)
-      else if (inTable || (i > 0 && lines[i-1].match(/^[-]+$/))) {
-        // This is likely data under a header
-        const trimmed = line.trim();
-        if (trimmed && !trimmed.match(/^[-]+$/) && trimmed.match(/^\d/)) {
-          // Find the header from previous lines
-          for (let j = i - 1; j >= 0; j--) {
-            const prevLine = lines[j].trim();
-            if (prevLine && !prevLine.match(/^[-]+$/) && !prevLine.includes('SELECT')) {
-              // This might be our header
-              dataLines.push([prevLine, trimmed]);
-              break;
+      };
+
+    case 'ueByType':
+      return {
+        value: data.reduce((sum, item) => sum + item.device_count, 0).toString(),
+        chartData: {
+          series: data.map(item => item.device_count),
+          labels: data.map(item => item.device_type),
+          type: 'donut'
+        }
+      };
+
+    case 'networkAvailability':
+      return {
+        value: data.length > 0 ? `${data[0]?.avg_availability?.toFixed(2) || '0'}%` : '0%',
+        chartData: {
+          series: [{
+            name: 'Availability %',
+            data: data.map(item => parseFloat(item.avg_availability || 0).toFixed(2))
+          }],
+          categories: data.map(item => item.network_name),
+          type: 'bar'
+        }
+      };
+
+    case 'averageLatency':
+      return {
+        value: data.length > 0 ? `${data[0]?.avg_latency_ms?.toFixed(2) || '0'}ms` : '0ms',
+        chartData: {
+          series: [{
+            name: 'Latency (ms)',
+            data: data.map(item => parseFloat(item.avg_latency_ms || 0).toFixed(2))
+          }],
+          categories: data.map(item => item.network_name),
+          type: 'line'
+        }
+      };
+
+    case 'averageThroughput':
+      return {
+        value: data.length > 0 ? `${data[0]?.avg_downlink_mbps?.toFixed(2) || '0'} Mbps` : '0 Mbps',
+        chartData: {
+          series: [
+            {
+              name: 'Downlink (Mbps)',
+              data: data.map(item => parseFloat(item.avg_downlink_mbps || 0).toFixed(2))
+            },
+            {
+              name: 'Uplink (Mbps)',
+              data: data.map(item => parseFloat(item.avg_uplink_mbps || 0).toFixed(2))
             }
-          }
+          ],
+          categories: data.map(item => item.network_name),
+          type: 'bar'
         }
-      }
-      // Look for space-separated data
-      else if (line.match(/^\w+\s+\d/) || line.match(/^\d{4}-\d{2}-\d{2}/)) {
-        const parts = line.split(/\s{2,}|\t/).filter(part => part.trim());
-        if (parts.length > 1) {
-          dataLines.push(parts);
-        }
-      }
-    }
-    
-    // If no table format found, try to extract single values
-    if (dataLines.length === 0) {
-      console.log(`No table data found for ${queryType}, trying single value parsing...`);
-      return parseSingleValueResponse(result, queryType);
-    }
-    
-    // Convert table data to objects based on query type
-    const objects = convertTableToObjects(dataLines, queryType, headerLine);
-    console.log(`Converted table to objects for ${queryType}:`, objects);
-    return objects;
-    
-  } catch (error) {
-    console.error(`Error parsing table response for ${queryType}:`, error);
-    return [];
-  }
-};
+      };
 
-// Helper function to parse single value responses
-const parseSingleValueResponse = (result, queryType) => {
-  const lines = result.split('\n').map(line => line.trim()).filter(line => line);
-  
-  for (const line of lines) {
-    // Skip explanatory text
-    if (line.includes('SELECT') || line.includes('I\'ll execute') || line.includes('Query') || 
-        line.includes('Raw results') || line.includes('Count') || line.includes('Getting') ||
-        line.includes('Counting') || line.includes('Calculating') || line.includes('---')) {
-      continue;
-    }
-    
-    // Look for numeric values
-    const numberMatch = line.match(/(\d+(?:\.\d+)?)/);
-    if (numberMatch) {
-      const value = parseFloat(numberMatch[1]);
-      
-      switch (queryType) {
-        case 'enterpriseCount':
-          return [{ total_enterprises: value }];
-        case 'totalDevices':
-          return [{ total_devices: value }];
-        case 'todayUsage':
-          return [{ total_tb: value }];
-        default:
-          return [{ value: value }];
-      }
-    }
-  }
-  
-  // If no number found, try to parse table-like single column data
-  const headerLine = lines.find(line => 
-    line.includes('total_') || line.includes('count') || line.includes('enterprises') || 
-    line.includes('devices') || line.includes('lines') || line.includes('tb')
-  );
-  
-  if (headerLine) {
-    const headerIndex = lines.indexOf(headerLine);
-    // Look for the value in subsequent lines
-    for (let i = headerIndex + 1; i < lines.length; i++) {
-      const line = lines[i];
-      if (line.match(/^\d+(\.\d+)?$/) || line.match(/^-+$/)) {
-        if (!line.match(/^-+$/)) {
-          const value = parseFloat(line);
-          
-          if (headerLine.includes('total_enterprises')) {
-            return [{ total_enterprises: value }];
-          } else if (headerLine.includes('total_active_lines')) {
-            return [{ total_active_lines: value }];
-          } else if (headerLine.includes('total_devices')) {
-            return [{ total_devices: value }];
-          } else if (headerLine.includes('total_tb')) {
-            return [{ total_tb: value }];
-          } else {
-            return [{ value: value }];
-          }
+    case 'handoverSuccess':
+      return {
+        value: data.length > 0 ? `${data[0]?.success_rate_percentage || '0'}%` : '0%',
+        chartData: {
+          series: [{
+            name: 'Success Rate %',
+            data: data.map(item => parseFloat(item.success_rate_percentage || 0))
+          }],
+          categories: data.map(item => item.network_name),
+          type: 'bar'
         }
-      }
-    }
-  }
-  
-  return [];
-};
+      };
 
-// Helper function to convert table data to objects
-const convertTableToObjects = (dataLines, queryType, headerLine = null) => {
-  if (dataLines.length === 0) return [];
-  
-  let headers = [];
-  let dataRows = [];
-  
-  if (headerLine) {
-    headers = headerLine;
-    dataRows = dataLines;
-  } else {
-    // Try to identify headers vs data from the first row
-    const firstRow = dataLines[0];
-    const hasHeaders = firstRow.some(cell => 
-      cell.includes('_') || 
-      cell.toLowerCase().includes('date') || 
-      cell.toLowerCase().includes('count') ||
-      cell.toLowerCase().includes('total') ||
-      cell.toLowerCase().includes('industry') ||
-      cell.toLowerCase().includes('device') ||
-      cell.toLowerCase().includes('month')
-    );
-    
-    if (hasHeaders && dataLines.length > 1) {
-      headers = firstRow;
-      dataRows = dataLines.slice(1);
-    } else {
-      // Infer headers based on query type
-      headers = inferHeaders(queryType, firstRow.length);
-      dataRows = dataLines;
-    }
-  }
-  
-  console.log(`Using headers for ${queryType}:`, headers);
-  console.log(`Processing data rows for ${queryType}:`, dataRows);
-  
-  // Convert rows to objects
-  return dataRows.map(row => {
-    const obj = {};
-    headers.forEach((header, index) => {
-      if (index < row.length) {
-        let value = row[index];
-        
-        // Clean up the value
-        value = value.replace(/['"]/g, '').trim();
-        
-        // Try to parse as number if it looks like one
-        if (value.match(/^\d+(\.\d+)?$/)) {
-          obj[header] = parseFloat(value);
-        } else if (value.match(/^\d+$/)) {
-          obj[header] = parseInt(value);
-        } else {
-          obj[header] = value;
+    case 'slaCompliance':
+      const slaData = data.reduce((acc, item) => {
+        if (!acc[item.network_name]) {
+          acc[item.network_name] = {};
         }
-      }
-    });
-    return obj;
-  });
-};
+        acc[item.network_name][item.sla_type] = parseFloat(item.compliance_percentage || 0);
+        return acc;
+      }, {});
 
-// Helper function to infer headers based on query type
-const inferHeaders = (queryType, columnCount) => {
-  switch (queryType) {
-    case 'dailyUsage':
-      return ['date', 'total_gb'];
-    case 'enterprisesByIndustry':
-      return ['industry', 'count'];
-    case 'lineSubscriptions':
-      return ['status', 'count'];
-    case 'lineSubscriptionsTrend':
-      return ['week', 'weekly_count'];
-    case 'devices':
-      return ['device_type', 'count'];
-    case 'usageTotalsDaily':
-      return ['date', 'daily_data_gb', 'daily_voice_minutes', 'daily_sms_count'];
-    case 'usageTotals':
-      return ['total_data_gb', 'total_voice_minutes', 'total_sms_count'];
-    case 'billingOverview':
-      return ['total_bills', 'total_revenue', 'avg_bill_amount', 'paid_bills', 'overdue_bills'];
-    case 'monthlyRevenue':
-      return ['month', 'monthly_revenue'];
+      return {
+        value: data.length > 0 ? `${Object.keys(slaData).length} Networks` : '0 Networks',
+        chartData: {
+          series: Object.keys(slaData).map(networkName => ({
+            name: networkName,
+            data: Object.values(slaData[networkName])
+          })),
+          categories: ['Availability', 'Latency', 'Throughput', 'Packet Loss'],
+          type: 'radar'
+        }
+      };
+
     default:
-      // Generic headers
-      const headers = [];
-      for (let i = 0; i < columnCount; i++) {
-        headers.push(`column_${i}`);
-      }
-      return headers;
+      return {
+        value: '0',
+        chartData: null
+      };
   }
 };

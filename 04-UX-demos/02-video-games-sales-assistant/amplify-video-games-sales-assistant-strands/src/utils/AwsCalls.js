@@ -8,8 +8,177 @@ import { extractBetweenTags, removeCharFromStartAndEnd, handleFormatter } from "
 import {
   QUESTION_ANSWERS_TABLE_NAME,
   MODEL_ID_FOR_CHART,
-  CHART_PROMPT
+  CHART_PROMPT,
+  AGENT_ENDPOINT_URL
 } from "../env.js";
+
+// Generate unique UUID
+const generateUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
+// Generate session ID (persistent for the page session)
+let sessionId = null;
+const getSessionId = () => {
+  if (!sessionId) {
+    sessionId = `mpn-kpi-session-${generateUUID()}`;
+  }
+  return sessionId;
+};
+
+/**
+ * Execute a database query against PostgreSQL RDS through agent endpoint
+ * @param {string} query - SQL query to execute
+ * @returns {Promise<Array>} - Query results
+ */
+export const executeQuery = async (query) => {
+  try {
+    console.log('Executing query:', query);
+    
+    const uniquePromptId = `mpn-query-${generateUUID()}`;
+    const currentSessionId = getSessionId();
+    
+    const response = await fetch(AGENT_ENDPOINT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        bedrock_model_id: 'us.anthropic.claude-3-7-sonnet-20250219-v1:0',
+        prompt: `Please execute this SQL query directly and return only the raw results: ${query}`,
+        prompt_uuid: uniquePromptId,
+        user_timezone: 'America/Mexico_City',
+        session_id: currentSessionId
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    // Read the streaming response
+    const reader = response.body.getReader();
+    let result = '';
+    
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      result += new TextDecoder().decode(value);
+    }
+
+    // Parse the result
+    const parsedResult = parseQueryResult(result, query);
+    console.log('Query result:', parsedResult);
+    return parsedResult;
+    
+  } catch (error) {
+    console.error('Database query error:', error);
+    return [];
+  }
+};
+
+// Parse query results from agent responses
+const parseQueryResult = (result, query) => {
+  try {
+    // First, try to extract JSON from the response
+    let parsedData = extractJSONFromResponse(result);
+    if (parsedData) {
+      return Array.isArray(parsedData) ? parsedData : [parsedData];
+    }
+    
+    // If no JSON found, parse as table format
+    return parseTableResponse(result, query);
+    
+  } catch (error) {
+    console.error('Error parsing query result:', error);
+    return [];
+  }
+};
+
+// Helper function to extract JSON from various response formats
+const extractJSONFromResponse = (result) => {
+  try {
+    // Look for JSON wrapped in code blocks
+    const codeBlockMatch = result.match(/```(?:json)?\s*(\[.*?\]|\{.*?\})\s*```/s);
+    if (codeBlockMatch) {
+      return JSON.parse(codeBlockMatch[1]);
+    }
+    
+    // Look for JSON arrays or objects in the text
+    const jsonArrayMatch = result.match(/\[[\s\S]*?\]/);
+    if (jsonArrayMatch) {
+      return JSON.parse(jsonArrayMatch[0]);
+    }
+    
+    const jsonObjectMatch = result.match(/\{[\s\S]*?\}/);
+    if (jsonObjectMatch) {
+      return JSON.parse(jsonObjectMatch[0]);
+    }
+    
+    return null;
+  } catch (error) {
+    return null;
+  }
+};
+
+// Helper function to parse table-formatted responses
+const parseTableResponse = (result, query) => {
+  try {
+    const lines = result.split('\n').map(line => line.trim()).filter(line => line);
+    
+    // For simple count queries, look for single numeric values
+    if (query.includes('COUNT(*)')) {
+      for (const line of lines) {
+        const numberMatch = line.match(/(\d+)/);
+        if (numberMatch) {
+          const value = parseInt(numberMatch[1]);
+          if (query.includes('total_networks')) {
+            return [{ total_networks: value }];
+          } else if (query.includes('total_devices')) {
+            return [{ total_devices: value }];
+          }
+        }
+      }
+    }
+    
+    // For GROUP BY queries, parse table format
+    let dataLines = [];
+    for (const line of lines) {
+      if (line.includes('|') || line.match(/^\w+\s+\d/)) {
+        const parts = line.split(/\||\s{2,}/).map(p => p.trim()).filter(p => p);
+        if (parts.length >= 2) {
+          dataLines.push(parts);
+        }
+      }
+    }
+    
+    return dataLines.map(row => {
+      const obj = {};
+      if (query.includes('enterprise_client')) {
+        obj.enterprise_client = row[0];
+        obj.network_count = parseInt(row[1]) || 0;
+      } else if (query.includes('device_type')) {
+        obj.device_type = row[0];
+        obj.device_count = parseInt(row[1]) || 0;
+      } else if (query.includes('network_name') && query.includes('availability')) {
+        obj.network_name = row[0];
+        obj.avg_availability = parseFloat(row[1]) || 0;
+      } else if (query.includes('network_name') && query.includes('rtt_ms')) {
+        obj.network_name = row[0];
+        obj.avg_latency_ms = parseFloat(row[1]) || 0;
+      }
+      return obj;
+    });
+    
+  } catch (error) {
+    console.error('Error parsing table response:', error);
+    return [];
+  }
+};
 
 /**
  * Query data from DynamoDB
