@@ -12,16 +12,33 @@ const formatChartData = (data, labelField, valueField, chartType = 'donut') => {
   }
 
   if (chartType === 'line') {
-    return {
-      series: [{
-        name: 'Availability %',
-        data: data.map(item => ({
-          x: new Date(item[labelField]).getTime(),
-          y: parseFloat(item[valueField]) || 0
-        }))
-      }],
-      type: 'line'
-    };
+    if (labelField === 'time_hour' && valueField === 'avg_latency_ms') {
+      // Multi-series for latency by network
+      const networks = [...new Set(data.map(item => item.network_name))];
+      const series = networks.map(network => ({
+        name: network,
+        data: data
+          .filter(item => item.network_name === network)
+          .map(item => ({
+            x: new Date(item[labelField]).getTime(),
+            y: parseFloat(item[valueField]) || 0
+          }))
+      }));
+      return { series, type: 'line' };
+    } else {
+      // Single series for availability
+      const seriesName = 'Availability %';
+      return {
+        series: [{
+          name: seriesName,
+          data: data.map(item => ({
+            x: new Date(item[labelField]).getTime(),
+            y: parseFloat(item[valueField]) || 0
+          }))
+        }],
+        type: 'line'
+      };
+    }
   }
 
   return {
@@ -80,8 +97,9 @@ const KPIDashboard = () => {
         },
         averageLatency: {
           loading: false,
-          data: formatChartData(averageLatencyResult, 'network_name', 'avg_latency_ms'),
-          value: averageLatencyResult[0]?.avg_latency_ms ? `${averageLatencyResult[0].avg_latency_ms.toFixed(1)}ms` : '0ms'
+          data: formatChartData(averageLatencyResult, 'time_hour', 'avg_latency_ms', 'line'),
+          value: averageLatencyResult.length > 0 ? 
+            `${(averageLatencyResult.reduce((sum, item) => sum + (item.avg_latency_ms || 0), 0) / averageLatencyResult.length).toFixed(1)}ms` : '0ms'
         },
         deviceCount: {
           loading: false,
@@ -143,6 +161,7 @@ const KPIDashboard = () => {
     };
 
     if (data.type === 'line') {
+      const isLatency = data.series.length > 1 || (data.series[0] && data.series[0].name !== 'Availability %');
       return {
         ...baseOptions,
         chart: { ...baseOptions.chart, type: 'line' },
@@ -153,12 +172,12 @@ const KPIDashboard = () => {
           }
         },
         yaxis: {
-          title: { text: 'Availability (%)' },
-          min: 98,
-          max: 100,
+          title: { text: isLatency ? 'Latency (ms)' : 'Availability (%)' },
+          min: isLatency ? undefined : 98,
+          max: isLatency ? undefined : 100,
           labels: {
             formatter: function (val) {
-              return val.toFixed(1) + '%';
+              return isLatency ? val.toFixed(1) + 'ms' : val.toFixed(1) + '%';
             }
           }
         },

@@ -176,6 +176,10 @@ const parseTableResponse = (result, query) => {
       } else if (query.includes('device_type')) {
         obj.device_type = row[0];
         obj.device_count = parseInt(row[1]) || 0;
+      } else if (query.includes('time_hour') && query.includes('network_name')) {
+        obj.time_hour = row[0];
+        obj.network_name = row[1];
+        obj.avg_latency_ms = parseFloat(row[2]) || 0;
       } else if (query.includes('time_hour')) {
         obj.time_hour = row[0];
         obj.avg_availability = parseFloat(row[1]) || 0;

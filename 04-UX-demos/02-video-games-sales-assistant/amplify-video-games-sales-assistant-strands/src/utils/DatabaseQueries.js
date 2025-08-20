@@ -49,7 +49,7 @@ export const kpiQueries = {
       DATE_TRUNC('hour', am.timestamp) as time_hour,
       ROUND(AVG(am.availability_percentage), 2) as avg_availability
     FROM availability_metrics am
-    WHERE am.timestamp >= NOW() - INTERVAL '7 days'
+    WHERE am.timestamp >= NOW() - INTERVAL '30 days'
     GROUP BY DATE_TRUNC('hour', am.timestamp)
     ORDER BY time_hour DESC
     LIMIT 50
@@ -58,14 +58,15 @@ export const kpiQueries = {
   // Average latency (last 24 hours)
   averageLatency: `
     SELECT 
+      DATE_TRUNC('hour', lm.timestamp) as time_hour,
       n.network_name,
-      AVG(lm.rtt_ms) as avg_latency_ms
+      ROUND(AVG(lm.rtt_ms), 2) as avg_latency_ms
     FROM networks n
     JOIN latency_metrics lm ON n.network_id = lm.network_id
-    WHERE lm.timestamp >= NOW() - INTERVAL '24 hours'
-    GROUP BY n.network_id, n.network_name
-    ORDER BY avg_latency_ms ASC
-    LIMIT 10
+    WHERE lm.timestamp >= NOW() - INTERVAL '30 days'
+    GROUP BY DATE_TRUNC('hour', lm.timestamp), n.network_id, n.network_name
+    ORDER BY time_hour DESC, n.network_name
+    LIMIT 150
   `,
   
   // Throughput performance (last 24 hours)
