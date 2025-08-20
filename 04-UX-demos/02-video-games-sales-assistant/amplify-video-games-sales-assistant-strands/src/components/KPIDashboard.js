@@ -1,19 +1,33 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Paper, Typography, CircularProgress, Grid } from '@mui/material';
+import { Box, Paper, Typography, CircularProgress, Grid, Card, CardContent, Chip, Avatar } from '@mui/material';
+import { NetworkCheck, Speed, Devices, TrendingUp } from '@mui/icons-material';
 import Chart from 'react-apexcharts';
 import { executeQuery } from '../utils/AwsCalls';
 import { kpiQueries } from '../utils/DatabaseQueries';
 
 // Helper function to format data for charts
-const formatChartData = (data, labelField, valueField) => {
+const formatChartData = (data, labelField, valueField, chartType = 'donut') => {
   if (!data || !Array.isArray(data) || data.length === 0) {
-    return { series: [], labels: [], type: 'pie' };
+    return { series: [], labels: [], type: chartType };
+  }
+
+  if (chartType === 'line') {
+    return {
+      series: [{
+        name: 'Availability %',
+        data: data.map(item => ({
+          x: new Date(item[labelField]).getTime(),
+          y: parseFloat(item[valueField]) || 0
+        }))
+      }],
+      type: 'line'
+    };
   }
 
   return {
     series: data.map(item => item[valueField] || 0),
     labels: data.map(item => item[labelField] || 'Unknown'),
-    type: 'pie'
+    type: chartType
   };
 };
 
@@ -25,12 +39,9 @@ const KPIDashboard = () => {
     deviceCount: { loading: true, data: null, value: '0' }
   });
 
-  // Add refs to track fetch state and prevent multiple simultaneous fetches
   const isFetchingRef = useRef(false);
 
-  // Function to fetch real data from database
   const fetchRealData = async () => {
-    // Prevent multiple simultaneous fetches
     if (isFetchingRef.current) {
       console.log('Fetch already in progress, skipping...');
       return;
@@ -40,7 +51,6 @@ const KPIDashboard = () => {
       isFetchingRef.current = true;
       console.log('Fetching MPN KPI data from database...');
 
-      // Execute essential queries for 4 main KPIs
       const [
         networksByClientResult,
         networkAvailabilityResult,
@@ -53,16 +63,9 @@ const KPIDashboard = () => {
         executeQuery(kpiQueries.ueByType)
       ]);
 
-      console.log('Query result for Networks by client:', networksByClientResult);
-      console.log('Query result for Network availability:', networkAvailabilityResult);
-      console.log('Query result for Average latency:', averageLatencyResult);
-      console.log('Query result for Devices by type:', ueByTypeResult);
-
-      // Calculate totals from the detailed results
       const totalNetworks = networksByClientResult.reduce((sum, item) => sum + (item.network_count || 0), 0);
       const totalDevices = ueByTypeResult.reduce((sum, item) => sum + (item.device_count || 0), 0);
 
-      // Update state with real data
       setKpiData({
         networkOverview: {
           loading: false,
@@ -71,8 +74,9 @@ const KPIDashboard = () => {
         },
         networkAvailability: {
           loading: false,
-          data: formatChartData(networkAvailabilityResult, 'network_name', 'avg_availability'),
-          value: networkAvailabilityResult[0]?.avg_availability ? `${networkAvailabilityResult[0].avg_availability.toFixed(1)}%` : '0%'
+          data: formatChartData(networkAvailabilityResult, 'time_hour', 'avg_availability', 'line'),
+          value: networkAvailabilityResult.length > 0 ? 
+            `${(networkAvailabilityResult.reduce((sum, item) => sum + (item.avg_availability || 0), 0) / networkAvailabilityResult.length).toFixed(1)}%` : '0%'
         },
         averageLatency: {
           loading: false,
@@ -90,74 +94,8 @@ const KPIDashboard = () => {
 
     } catch (error) {
       console.error('Error fetching MPN KPI data:', error);
-      
-      // Set mock data on error
-      setKpiData({
-        networkOverview: {
-          loading: false,
-          data: getMockChartData('networksByClient'),
-          value: '3'
-        },
-        networkAvailability: {
-          loading: false,
-          data: getMockChartData('networkAvailability'),
-          value: '99.85%'
-        },
-        averageLatency: {
-          loading: false,
-          data: getMockChartData('averageLatency'),
-          value: '12.5ms'
-        },
-        deviceCount: {
-          loading: false,
-          data: getMockChartData('devicesByType'),
-          value: '60'
-        }
-      });
     } finally {
       isFetchingRef.current = false;
-    }
-  };
-
-  // Mock data for fallback
-  const getMockChartData = (type) => {
-    switch (type) {
-      case 'networksByClient':
-        return {
-          series: [1, 1, 1],
-          labels: ['PEMEX', 'América Móvil', 'Grupo Bimbo'],
-          type: 'pie'
-        };
-      
-      case 'networkAvailability':
-        return {
-          series: [{
-            name: 'Availability %',
-            data: [99.85, 99.92, 99.78]
-          }],
-          categories: ['MPN-001', 'MPN-002', 'MPN-003'],
-          type: 'bar'
-        };
-      
-      case 'averageLatency':
-        return {
-          series: [{
-            name: 'Latency (ms)',
-            data: [12.5, 8.3, 15.7]
-          }],
-          categories: ['MPN-001', 'MPN-002', 'MPN-003'],
-          type: 'line'
-        };
-      
-      case 'devicesByType':
-        return {
-          series: [25, 15, 12, 5, 3],
-          labels: ['Smartphone', 'Tablet', 'IoT Sensor', 'Laptop', 'Industrial Device'],
-          type: 'donut'
-        };
-      
-      default:
-        return null;
     }
   };
 
@@ -165,120 +103,272 @@ const KPIDashboard = () => {
     fetchRealData();
   }, []);
 
-  // Chart configurations
+  // Enhanced chart configurations with Telcel blue theme
   const getChartOptions = (kpiType, data) => {
     if (!data) return {};
 
+    const telcelBlueGradient = ['#0066CC', '#1E88E5', '#42A5F5', '#64B5F6', '#90CAF9', '#BBDEFB'];
+    
     const baseOptions = {
       chart: {
-        height: 300,
-        toolbar: { show: false }
+        height: 280,
+        toolbar: { show: false },
+        background: 'transparent',
+        dropShadow: {
+          enabled: true,
+          top: 3,
+          left: 2,
+          blur: 4,
+          opacity: 0.1,
+        }
       },
-      colors: ['#0066CC', '#1E88E5', '#004499', '#42A5F5', '#64B5F6', '#90CAF9', '#BBDEFB', '#E3F2FD'],
+      colors: telcelBlueGradient,
       legend: {
-        position: 'bottom'
+        position: 'bottom',
+        fontSize: '12px',
+        fontFamily: 'Roboto, sans-serif',
+        markers: {
+          width: 8,
+          height: 8,
+          radius: 4,
+        }
+      },
+      tooltip: {
+        theme: 'light',
+        style: {
+          fontSize: '12px',
+          fontFamily: 'Roboto, sans-serif',
+        }
       }
     };
 
-    switch (data.type) {
-      case 'pie':
-        return {
-          ...baseOptions,
-          chart: { ...baseOptions.chart, type: 'pie' },
-          labels: data.labels,
-          dataLabels: {
-            enabled: true,
+    if (data.type === 'line') {
+      return {
+        ...baseOptions,
+        chart: { ...baseOptions.chart, type: 'line' },
+        xaxis: {
+          type: 'datetime',
+          labels: {
+            format: 'MMM dd HH:mm'
+          }
+        },
+        yaxis: {
+          title: { text: 'Availability (%)' },
+          min: 98,
+          max: 100,
+          labels: {
             formatter: function (val) {
               return val.toFixed(1) + '%';
             }
           }
-        };
+        },
+        stroke: {
+          curve: 'smooth',
+          width: 3
+        },
+        dataLabels: { enabled: false },
+        grid: {
+          borderColor: '#e7e7e7',
+          row: {
+            colors: ['#f3f3f3', 'transparent'],
+            opacity: 0.5
+          }
+        }
+      };
+    }
 
-      case 'donut':
-        return {
-          ...baseOptions,
-          chart: { ...baseOptions.chart, type: 'donut' },
-          labels: data.labels,
-          dataLabels: {
-            enabled: true,
-            formatter: function (val) {
-              return val.toFixed(1) + '%';
+    return {
+      ...baseOptions,
+      chart: { ...baseOptions.chart, type: 'donut' },
+      labels: data.labels,
+      dataLabels: {
+        enabled: true,
+        formatter: function (val, opts) {
+          // For Network Overview, show actual counts instead of percentages
+          if (kpiType === 'networkoverview') {
+            return data.series[opts.seriesIndex];
+          }
+          return val.toFixed(1) + '%';
+        },
+        style: {
+          fontSize: '11px',
+          fontFamily: 'Roboto, sans-serif',
+          fontWeight: 600,
+          colors: ['#fff']
+        },
+        dropShadow: {
+          enabled: true,
+          top: 1,
+          left: 1,
+          blur: 1,
+          opacity: 0.8
+        }
+      },
+      plotOptions: {
+        pie: {
+          donut: {
+            size: '65%',
+            labels: {
+              show: true,
+              name: {
+                show: true,
+                fontSize: '14px',
+                fontFamily: 'Roboto, sans-serif',
+                fontWeight: 600,
+                color: '#0066CC'
+              },
+              value: {
+                show: true,
+                fontSize: '20px',
+                fontFamily: 'Roboto, sans-serif',
+                fontWeight: 700,
+                color: '#000',
+                formatter: function (val) {
+                  return parseInt(val);
+                }
+              },
+              total: {
+                show: true,
+                showAlways: false,
+                label: 'Total',
+                fontSize: '12px',
+                fontFamily: 'Roboto, sans-serif',
+                fontWeight: 600,
+                color: '#0066CC'
+              }
             }
           }
-        };
+        }
+      },
+      stroke: {
+        width: 2,
+        colors: ['#fff']
+      }
+    };
+  };
 
-      case 'bar':
-        return {
-          ...baseOptions,
-          chart: { ...baseOptions.chart, type: 'bar' },
-          xaxis: { categories: data.categories },
-          yaxis: {
-            title: { text: kpiType === 'networkAvailability' ? 'Availability (%)' : 'Success Rate (%)' }
-          },
-          dataLabels: { enabled: false }
-        };
-
-      case 'line':
-        return {
-          ...baseOptions,
-          chart: { ...baseOptions.chart, type: 'line' },
-          xaxis: { categories: data.categories },
-          yaxis: {
-            title: { text: 'Latency (ms)' }
-          },
-          stroke: { curve: 'smooth' },
-          dataLabels: { enabled: false }
-        };
-
-      default:
-        return baseOptions;
+  const getKpiIcon = (title) => {
+    switch (title.toLowerCase()) {
+      case 'network overview': return <NetworkCheck sx={{ fontSize: 28, color: '#0066CC' }} />;
+      case 'network availability': return <TrendingUp sx={{ fontSize: 28, color: '#0066CC' }} />;
+      case 'average latency': return <Speed sx={{ fontSize: 28, color: '#0066CC' }} />;
+      case 'connected devices': return <Devices sx={{ fontSize: 28, color: '#0066CC' }} />;
+      default: return <NetworkCheck sx={{ fontSize: 28, color: '#0066CC' }} />;
     }
   };
 
   const KPICard = ({ title, value, loading, chartData, description }) => (
-    <Paper elevation={3} sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Typography variant="h6" gutterBottom sx={{ color: '#0066CC', fontWeight: 'bold' }}>
-        {title}
-      </Typography>
-      
-      {loading ? (
-        <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
-          <CircularProgress size={40} sx={{ color: '#0066CC' }} />
-        </Box>
-      ) : (
-        <>
-          <Typography variant="h4" sx={{ color: '#000000', fontWeight: 'bold', mb: 2 }}>
-            {value}
-          </Typography>
-          
-          {description && (
-            <Typography variant="body2" sx={{ color: '#333333', mb: 2 }}>
-              {description}
+    <Card 
+      elevation={0}
+      sx={{ 
+        height: '100%', 
+        background: 'linear-gradient(135deg, #ffffff 0%, #f8fafe 100%)',
+        border: '1px solid #e3f2fd',
+        borderRadius: 3,
+        transition: 'all 0.3s ease-in-out',
+        '&:hover': {
+          transform: 'translateY(-4px)',
+          boxShadow: '0 12px 24px rgba(0, 102, 204, 0.15)',
+          borderColor: '#0066CC'
+        }
+      }}
+    >
+      <CardContent sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+          <Avatar 
+            sx={{ 
+              bgcolor: 'rgba(0, 102, 204, 0.1)', 
+              mr: 2,
+              width: 48,
+              height: 48
+            }}
+          >
+            {getKpiIcon(title)}
+          </Avatar>
+          <Box>
+            <Typography 
+              variant="h6" 
+              sx={{ 
+                color: '#0066CC', 
+                fontWeight: 700,
+                fontSize: '1.1rem',
+                lineHeight: 1.2
+              }}
+            >
+              {title}
             </Typography>
-          )}
-          
-          {chartData && (
-            <Box flex={1} display="flex" alignItems="center">
-              <Chart
-                options={getChartOptions(title.toLowerCase().replace(/\s+/g, ''), chartData)}
-                series={chartData.series}
-                type={chartData.type}
-                height={250}
-                width="100%"
-              />
-            </Box>
-          )}
-        </>
-      )}
-    </Paper>
+            <Chip 
+              label="Live" 
+              size="small" 
+              sx={{ 
+                bgcolor: '#e8f5e8', 
+                color: '#2e7d32',
+                fontSize: '0.7rem',
+                height: 20,
+                mt: 0.5
+              }} 
+            />
+          </Box>
+        </Box>
+        
+        {loading ? (
+          <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
+            <CircularProgress size={40} sx={{ color: '#0066CC' }} />
+          </Box>
+        ) : (
+          <>
+            <Typography 
+              variant="h3" 
+              sx={{ 
+                color: '#000', 
+                fontWeight: 800,
+                mb: 1,
+                fontSize: '2.5rem',
+                background: 'linear-gradient(135deg, #0066CC 0%, #1E88E5 100%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent'
+              }}
+            >
+              {value}
+            </Typography>
+            
+            {description && (
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  color: '#666', 
+                  mb: 2,
+                  fontSize: '0.85rem',
+                  fontWeight: 500
+                }}
+              >
+                {description}
+              </Typography>
+            )}
+            
+            {chartData && chartData.series.length > 0 && (
+              <Box flex={1} display="flex" alignItems="center" justifyContent="center">
+                <Chart
+                  options={getChartOptions(title.toLowerCase().replace(/\s+/g, ''), chartData)}
+                  series={chartData.series}
+                  type={chartData.type}
+                  height={280}
+                  width="100%"
+                />
+              </Box>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom sx={{ color: '#0066CC', fontWeight: 'bold', mb: 4 }}>
-        Mobile Private Network KPIs Dashboard
-      </Typography>
-      
+    <Box sx={{ 
+      p: 2, 
+      background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)'
+    }}>
       <Grid container spacing={3}>
         <Grid item xs={12} md={6} lg={3}>
           <KPICard

@@ -13,7 +13,6 @@ export const kpiQueries = {
     FROM networks
     GROUP BY enterprise_client
     ORDER BY network_count DESC
-    LIMIT 10
   `,
   
   // Cell infrastructure
@@ -47,14 +46,13 @@ export const kpiQueries = {
   // Network availability (last 24 hours)
   networkAvailability: `
     SELECT 
-      n.network_name,
-      AVG(am.availability_percentage) as avg_availability
-    FROM networks n
-    JOIN availability_metrics am ON n.network_id = am.network_id
-    WHERE am.timestamp >= NOW() - INTERVAL '24 hours'
-    GROUP BY n.network_id, n.network_name
-    ORDER BY avg_availability DESC
-    LIMIT 10
+      DATE_TRUNC('hour', am.timestamp) as time_hour,
+      ROUND(AVG(am.availability_percentage), 2) as avg_availability
+    FROM availability_metrics am
+    WHERE am.timestamp >= NOW() - INTERVAL '7 days'
+    GROUP BY DATE_TRUNC('hour', am.timestamp)
+    ORDER BY time_hour DESC
+    LIMIT 50
   `,
   
   // Average latency (last 24 hours)

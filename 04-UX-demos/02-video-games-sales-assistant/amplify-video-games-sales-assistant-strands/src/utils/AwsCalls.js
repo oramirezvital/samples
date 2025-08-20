@@ -151,12 +151,24 @@ const parseTableResponse = (result, query) => {
       if (line.includes('|') || line.match(/^\w+\s+\d/)) {
         const parts = line.split(/\||\s{2,}/).map(p => p.trim()).filter(p => p);
         if (parts.length >= 2) {
-          dataLines.push(parts);
+          // Skip headers and separator lines
+          if (!parts[0].includes('Client') && 
+              !parts[0].includes('Enterprise') && 
+              !parts[0].includes('network_count') &&
+              !parts[0].includes('device_type') &&
+              !parts[0].includes('network_name') &&
+              !parts[0].includes('availability') &&
+              !parts[0].includes('latency') &&
+              !parts[0].match(/^-+$/)) {
+            dataLines.push(parts);
+          }
         }
       }
     }
     
-    return dataLines.map(row => {
+    console.log(`Raw data lines for query:`, dataLines);
+    
+    const parsedResults = dataLines.map(row => {
       const obj = {};
       if (query.includes('enterprise_client')) {
         obj.enterprise_client = row[0];
@@ -164,6 +176,9 @@ const parseTableResponse = (result, query) => {
       } else if (query.includes('device_type')) {
         obj.device_type = row[0];
         obj.device_count = parseInt(row[1]) || 0;
+      } else if (query.includes('time_hour')) {
+        obj.time_hour = row[0];
+        obj.avg_availability = parseFloat(row[1]) || 0;
       } else if (query.includes('network_name') && query.includes('availability')) {
         obj.network_name = row[0];
         obj.avg_availability = parseFloat(row[1]) || 0;
@@ -172,7 +187,20 @@ const parseTableResponse = (result, query) => {
         obj.avg_latency_ms = parseFloat(row[1]) || 0;
       }
       return obj;
-    });
+    }).filter(obj => Object.keys(obj).length > 0);
+    
+    // Apply LIMIT from query if specified
+    if (query.includes('LIMIT')) {
+      const limitMatch = query.match(/LIMIT\s+(\d+)/i);
+      if (limitMatch) {
+        const limit = parseInt(limitMatch[1]);
+        console.log(`Applying LIMIT ${limit} to ${parsedResults.length} results`);
+        return parsedResults.slice(0, limit);
+      }
+    }
+    
+    console.log(`Final parsed results:`, parsedResults);
+    return parsedResults;
     
   } catch (error) {
     console.error('Error parsing table response:', error);
