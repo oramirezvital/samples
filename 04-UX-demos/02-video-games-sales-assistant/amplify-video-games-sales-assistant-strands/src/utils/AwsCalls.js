@@ -154,11 +154,16 @@ const parseTableResponse = (result, query) => {
           // Skip headers and separator lines
           if (!parts[0].includes('Client') && 
               !parts[0].includes('Enterprise') && 
+              !parts[0].includes('enterprise_client') &&
               !parts[0].includes('network_count') &&
               !parts[0].includes('device_type') &&
+              !parts[0].includes('device_count') &&
               !parts[0].includes('network_name') &&
               !parts[0].includes('availability') &&
+              !parts[0].includes('avg_availability') &&
               !parts[0].includes('latency') &&
+              !parts[0].includes('avg_latency_ms') &&
+              !parts[0].includes('time_hour') &&
               !parts[0].match(/^-+$/)) {
             dataLines.push(parts);
           }

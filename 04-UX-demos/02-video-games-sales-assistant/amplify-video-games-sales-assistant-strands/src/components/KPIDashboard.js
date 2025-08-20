@@ -56,69 +56,114 @@ const KPIDashboard = () => {
     deviceCount: { loading: true, data: null, value: '0' }
   });
 
-  const isFetchingRef = useRef(false);
+  const isFetchingRef = useRef({
+    networkOverview: false,
+    networkAvailability: false,
+    averageLatency: false,
+    deviceCount: false
+  });
 
-  const fetchRealData = async () => {
-    if (isFetchingRef.current) {
-      console.log('Fetch already in progress, skipping...');
-      return;
-    }
-
+  // Individual fetch functions for each KPI
+  const fetchNetworkOverview = async () => {
+    if (isFetchingRef.current.networkOverview) return;
+    
     try {
-      isFetchingRef.current = true;
-      console.log('Fetching MPN KPI data from database...');
-
-      const [
-        networksByClientResult,
-        networkAvailabilityResult,
-        averageLatencyResult,
-        ueByTypeResult
-      ] = await Promise.all([
-        executeQuery(kpiQueries.networksByClient),
-        executeQuery(kpiQueries.networkAvailability),
-        executeQuery(kpiQueries.averageLatency),
-        executeQuery(kpiQueries.ueByType)
-      ]);
-
-      const totalNetworks = networksByClientResult.reduce((sum, item) => sum + (item.network_count || 0), 0);
-      const totalDevices = ueByTypeResult.reduce((sum, item) => sum + (item.device_count || 0), 0);
-
-      setKpiData({
+      isFetchingRef.current.networkOverview = true;
+      const result = await executeQuery(kpiQueries.networksByClient);
+      const totalNetworks = result.reduce((sum, item) => sum + (item.network_count || 0), 0);
+      
+      setKpiData(prev => ({
+        ...prev,
         networkOverview: {
           loading: false,
-          data: formatChartData(networksByClientResult, 'enterprise_client', 'network_count'),
+          data: formatChartData(result, 'enterprise_client', 'network_count'),
           value: totalNetworks.toString()
-        },
+        }
+      }));
+    } catch (error) {
+      console.error('Error fetching Network Overview:', error);
+    } finally {
+      isFetchingRef.current.networkOverview = false;
+    }
+  };
+
+  const fetchNetworkAvailability = async () => {
+    if (isFetchingRef.current.networkAvailability) return;
+    
+    try {
+      isFetchingRef.current.networkAvailability = true;
+      const result = await executeQuery(kpiQueries.networkAvailability);
+      const avgValue = result.length > 0 ? 
+        (result.reduce((sum, item) => sum + (item.avg_availability || 0), 0) / result.length).toFixed(1) : '0';
+      
+      setKpiData(prev => ({
+        ...prev,
         networkAvailability: {
           loading: false,
-          data: formatChartData(networkAvailabilityResult, 'time_hour', 'avg_availability', 'line'),
-          value: networkAvailabilityResult.length > 0 ? 
-            `${(networkAvailabilityResult.reduce((sum, item) => sum + (item.avg_availability || 0), 0) / networkAvailabilityResult.length).toFixed(1)}%` : '0%'
-        },
+          data: formatChartData(result, 'time_hour', 'avg_availability', 'line'),
+          value: `${avgValue}%`
+        }
+      }));
+    } catch (error) {
+      console.error('Error fetching Network Availability:', error);
+    } finally {
+      isFetchingRef.current.networkAvailability = false;
+    }
+  };
+
+  const fetchAverageLatency = async () => {
+    if (isFetchingRef.current.averageLatency) return;
+    
+    try {
+      isFetchingRef.current.averageLatency = true;
+      const result = await executeQuery(kpiQueries.averageLatency);
+      const avgValue = result.length > 0 ? 
+        (result.reduce((sum, item) => sum + (item.avg_latency_ms || 0), 0) / result.length).toFixed(1) : '0';
+      
+      setKpiData(prev => ({
+        ...prev,
         averageLatency: {
           loading: false,
-          data: formatChartData(averageLatencyResult, 'time_hour', 'avg_latency_ms', 'line'),
-          value: averageLatencyResult.length > 0 ? 
-            `${(averageLatencyResult.reduce((sum, item) => sum + (item.avg_latency_ms || 0), 0) / averageLatencyResult.length).toFixed(1)}ms` : '0ms'
-        },
+          data: formatChartData(result, 'time_hour', 'avg_latency_ms', 'line'),
+          value: `${avgValue}ms`
+        }
+      }));
+    } catch (error) {
+      console.error('Error fetching Average Latency:', error);
+    } finally {
+      isFetchingRef.current.averageLatency = false;
+    }
+  };
+
+  const fetchDeviceCount = async () => {
+    if (isFetchingRef.current.deviceCount) return;
+    
+    try {
+      isFetchingRef.current.deviceCount = true;
+      const result = await executeQuery(kpiQueries.ueByType);
+      const totalDevices = result.reduce((sum, item) => sum + (item.device_count || 0), 0);
+      
+      setKpiData(prev => ({
+        ...prev,
         deviceCount: {
           loading: false,
-          data: formatChartData(ueByTypeResult, 'device_type', 'device_count'),
+          data: formatChartData(result, 'device_type', 'device_count'),
           value: totalDevices.toString()
         }
-      });
-
-      console.log('MPN KPI data fetched successfully');
-
+      }));
     } catch (error) {
-      console.error('Error fetching MPN KPI data:', error);
+      console.error('Error fetching Device Count:', error);
     } finally {
-      isFetchingRef.current = false;
+      isFetchingRef.current.deviceCount = false;
     }
   };
 
   useEffect(() => {
-    fetchRealData();
+    // Stagger the API calls to prevent race conditions
+    fetchNetworkOverview();
+    setTimeout(() => fetchNetworkAvailability(), 100);
+    setTimeout(() => fetchAverageLatency(), 200);
+    setTimeout(() => fetchDeviceCount(), 300);
   }, []);
 
   // Enhanced chart configurations with Telcel blue theme
