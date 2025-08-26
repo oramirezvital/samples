@@ -14,27 +14,51 @@ const formatChartData = (data, labelField, valueField, chartType = 'donut') => {
   if (chartType === 'line') {
     if (labelField === 'time_hour' && valueField === 'avg_latency_ms') {
       // Multi-series for latency by network
+      console.log('Processing latency data:', data);
       const networks = [...new Set(data.map(item => item.network_name))];
+      console.log('Networks found:', networks);
       const series = networks.map(network => ({
         name: network,
         data: data
-          .filter(item => item.network_name === network)
+          .filter(item => item.network_name === network && item[labelField] != null)
           .map(item => ({
             x: new Date(item[labelField]).getTime(),
             y: parseFloat(item[valueField]) || 0
           }))
       }));
+      console.log('Latency series:', series);
       return { series, type: 'line' };
     } else {
-      // Single series for availability
+      // Single series for availability - handle both time_hour and time_day
       const seriesName = 'Availability %';
+      const timeField = labelField === 'time_day' ? 'time_day' : 'time_hour';
+      console.log('Processing availability data:', data);
+      console.log('Using timeField:', timeField, 'valueField:', valueField);
+      
+      const processedData = data
+        .filter(item => {
+          const hasTime = item[timeField] != null;
+          const hasValue = item[valueField] != null;
+          const isNotHeader = item[timeField] !== 'time_day' && item[timeField] !== 'time_hour';
+          console.log('Item:', item, 'hasTime:', hasTime, 'hasValue:', hasValue, 'isNotHeader:', isNotHeader);
+          return hasTime && hasValue && isNotHeader;
+        })
+        .map(item => {
+          const timeValue = new Date(item[timeField]).getTime();
+          const yValue = parseFloat(item[valueField]);
+          console.log('Mapping:', item[timeField], '->', timeValue, item[valueField], '->', yValue);
+          return {
+            x: timeValue,
+            y: yValue
+          };
+        });
+      
+      console.log('Final processed data:', processedData);
+      
       return {
         series: [{
           name: seriesName,
-          data: data.map(item => ({
-            x: new Date(item[labelField]).getTime(),
-            y: parseFloat(item[valueField]) || 0
-          }))
+          data: processedData
         }],
         type: 'line'
       };
@@ -52,34 +76,38 @@ const KPIDashboard = () => {
   const [kpiData, setKpiData] = useState({
     networkOverview: { loading: true, data: null, value: '0' },
     networkAvailability: { loading: true, data: null, value: '0%' },
-    averageLatency: { loading: true, data: null, value: '0ms' },
     deviceCount: { loading: true, data: null, value: '0' }
   });
 
   const isFetchingRef = useRef({
     networkOverview: false,
     networkAvailability: false,
-    averageLatency: false,
     deviceCount: false
+  });
+
+  const cacheRef = useRef({
+    networkOverview: null,
+    networkAvailability: null,
+    deviceCount: null
   });
 
   // Individual fetch functions for each KPI
   const fetchNetworkOverview = async () => {
-    if (isFetchingRef.current.networkOverview) return;
+    if (isFetchingRef.current.networkOverview || cacheRef.current.networkOverview) return;
     
     try {
       isFetchingRef.current.networkOverview = true;
       const result = await executeQuery(kpiQueries.networksByClient);
       const totalNetworks = result.reduce((sum, item) => sum + (item.network_count || 0), 0);
       
-      setKpiData(prev => ({
-        ...prev,
-        networkOverview: {
-          loading: false,
-          data: formatChartData(result, 'enterprise_client', 'network_count'),
-          value: totalNetworks.toString()
-        }
-      }));
+      const kpiResult = {
+        loading: false,
+        data: formatChartData(result, 'enterprise_client', 'network_count'),
+        value: totalNetworks.toString()
+      };
+      
+      cacheRef.current.networkOverview = kpiResult;
+      setKpiData(prev => ({ ...prev, networkOverview: kpiResult }));
     } catch (error) {
       console.error('Error fetching Network Overview:', error);
     } finally {
@@ -88,22 +116,28 @@ const KPIDashboard = () => {
   };
 
   const fetchNetworkAvailability = async () => {
-    if (isFetchingRef.current.networkAvailability) return;
+    if (isFetchingRef.current.networkAvailability || cacheRef.current.networkAvailability) return;
     
     try {
       isFetchingRef.current.networkAvailability = true;
       const result = await executeQuery(kpiQueries.networkAvailability);
-      const avgValue = result.length > 0 ? 
-        (result.reduce((sum, item) => sum + (item.avg_availability || 0), 0) / result.length).toFixed(1) : '0';
+      console.log('Network Availability raw result:', result);
+      console.log('First item structure:', result[0]);
       
-      setKpiData(prev => ({
-        ...prev,
-        networkAvailability: {
-          loading: false,
-          data: formatChartData(result, 'time_hour', 'avg_availability', 'line'),
-          value: `${avgValue}%`
-        }
-      }));
+      const avgValue = result.length > 0 ? 
+        (result.reduce((sum, item) => sum + (parseFloat(item.avg_availability) || 0), 0) / result.length).toFixed(1) : '0';
+      
+      const chartData = formatChartData(result, 'time_day', 'avg_availability', 'line');
+      console.log('Network Availability chart data:', JSON.stringify(chartData, null, 2));
+      
+      const kpiResult = {
+        loading: false,
+        data: chartData,
+        value: `${avgValue}%`
+      };
+      
+      cacheRef.current.networkAvailability = kpiResult;
+      setKpiData(prev => ({ ...prev, networkAvailability: kpiResult }));
     } catch (error) {
       console.error('Error fetching Network Availability:', error);
     } finally {
@@ -111,46 +145,22 @@ const KPIDashboard = () => {
     }
   };
 
-  const fetchAverageLatency = async () => {
-    if (isFetchingRef.current.averageLatency) return;
-    
-    try {
-      isFetchingRef.current.averageLatency = true;
-      const result = await executeQuery(kpiQueries.averageLatency);
-      const avgValue = result.length > 0 ? 
-        (result.reduce((sum, item) => sum + (item.avg_latency_ms || 0), 0) / result.length).toFixed(1) : '0';
-      
-      setKpiData(prev => ({
-        ...prev,
-        averageLatency: {
-          loading: false,
-          data: formatChartData(result, 'time_hour', 'avg_latency_ms', 'line'),
-          value: `${avgValue}ms`
-        }
-      }));
-    } catch (error) {
-      console.error('Error fetching Average Latency:', error);
-    } finally {
-      isFetchingRef.current.averageLatency = false;
-    }
-  };
-
   const fetchDeviceCount = async () => {
-    if (isFetchingRef.current.deviceCount) return;
+    if (isFetchingRef.current.deviceCount || cacheRef.current.deviceCount) return;
     
     try {
       isFetchingRef.current.deviceCount = true;
       const result = await executeQuery(kpiQueries.ueByType);
       const totalDevices = result.reduce((sum, item) => sum + (item.device_count || 0), 0);
       
-      setKpiData(prev => ({
-        ...prev,
-        deviceCount: {
-          loading: false,
-          data: formatChartData(result, 'device_type', 'device_count'),
-          value: totalDevices.toString()
-        }
-      }));
+      const kpiResult = {
+        loading: false,
+        data: formatChartData(result, 'device_type', 'device_count'),
+        value: totalDevices.toString()
+      };
+      
+      cacheRef.current.deviceCount = kpiResult;
+      setKpiData(prev => ({ ...prev, deviceCount: kpiResult }));
     } catch (error) {
       console.error('Error fetching Device Count:', error);
     } finally {
@@ -159,11 +169,25 @@ const KPIDashboard = () => {
   };
 
   useEffect(() => {
-    // Stagger the API calls to prevent race conditions
-    fetchNetworkOverview();
-    setTimeout(() => fetchNetworkAvailability(), 100);
-    setTimeout(() => fetchAverageLatency(), 200);
-    setTimeout(() => fetchDeviceCount(), 300);
+    // Load cached data first
+    Object.keys(cacheRef.current).forEach(key => {
+      if (cacheRef.current[key]) {
+        setKpiData(prev => ({ ...prev, [key]: cacheRef.current[key] }));
+      }
+    });
+
+    // Execute queries sequentially with delays only if not cached
+    const fetchAllKPIs = async () => {
+      await fetchNetworkOverview();
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      await fetchNetworkAvailability();
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      await fetchDeviceCount();
+    };
+    
+    fetchAllKPIs();
   }, []);
 
   // Enhanced chart configurations with Telcel blue theme
@@ -218,8 +242,6 @@ const KPIDashboard = () => {
         },
         yaxis: {
           title: { text: isLatency ? 'Latency (ms)' : 'Availability (%)' },
-          min: isLatency ? undefined : 98,
-          max: isLatency ? undefined : 100,
           labels: {
             formatter: function (val) {
               return isLatency ? val.toFixed(1) + 'ms' : val.toFixed(1) + '%';
@@ -236,6 +258,37 @@ const KPIDashboard = () => {
           row: {
             colors: ['#f3f3f3', 'transparent'],
             opacity: 0.5
+          }
+        }
+      };
+    }
+
+    if (data.type === 'bar') {
+      return {
+        ...baseOptions,
+        chart: { ...baseOptions.chart, type: 'bar' },
+        xaxis: {
+          categories: data.series[0].data.map(item => item.x)
+        },
+        yaxis: {
+          title: { text: 'Latency (ms)' },
+          labels: {
+            formatter: function (val) {
+              return val.toFixed(1) + 'ms';
+            }
+          }
+        },
+        plotOptions: {
+          bar: {
+            horizontal: false,
+            columnWidth: '55%',
+            endingShape: 'rounded'
+          }
+        },
+        dataLabels: {
+          enabled: true,
+          formatter: function (val) {
+            return val.toFixed(1) + 'ms';
           }
         }
       };
@@ -451,16 +504,6 @@ const KPIDashboard = () => {
             loading={kpiData.networkAvailability.loading}
             chartData={kpiData.networkAvailability.data}
             description="Average availability in last 24 hours"
-          />
-        </Grid>
-        
-        <Grid item xs={12} md={6} lg={3}>
-          <KPICard
-            title="Average Latency"
-            value={kpiData.averageLatency.value}
-            loading={kpiData.averageLatency.loading}
-            chartData={kpiData.averageLatency.data}
-            description="Network response time in last 24 hours"
           />
         </Grid>
         

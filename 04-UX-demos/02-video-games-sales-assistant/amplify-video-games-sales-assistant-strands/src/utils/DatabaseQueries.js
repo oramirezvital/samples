@@ -43,30 +43,29 @@ export const kpiQueries = {
     ORDER BY device_count DESC
   `,
   
-  // Network availability (last 24 hours)
+  // Network availability (last 15 days) - Time series for line chart
   networkAvailability: `
     SELECT 
-      DATE_TRUNC('hour', am.timestamp) as time_hour,
+      DATE_TRUNC('day', am.timestamp) as time_day,
       ROUND(AVG(am.availability_percentage), 2) as avg_availability
     FROM availability_metrics am
-    WHERE am.timestamp >= NOW() - INTERVAL '30 days'
-    GROUP BY DATE_TRUNC('hour', am.timestamp)
-    ORDER BY time_hour DESC
-    LIMIT 50
+    WHERE am.timestamp >= NOW() - INTERVAL '15 days'
+    GROUP BY DATE_TRUNC('day', am.timestamp)
+    ORDER BY time_day ASC
+    LIMIT 15
   `,
   
-  // Average latency (last 24 hours)
+  // Average latency (last 30 days) - Optimized
   averageLatency: `
     SELECT 
-      DATE_TRUNC('hour', lm.timestamp) as time_hour,
       n.network_name,
       ROUND(AVG(lm.rtt_ms), 2) as avg_latency_ms
     FROM networks n
     JOIN latency_metrics lm ON n.network_id = lm.network_id
     WHERE lm.timestamp >= NOW() - INTERVAL '30 days'
-    GROUP BY DATE_TRUNC('hour', lm.timestamp), n.network_id, n.network_name
-    ORDER BY time_hour DESC, n.network_name
-    LIMIT 150
+    GROUP BY n.network_id, n.network_name
+    ORDER BY avg_latency_ms ASC
+    LIMIT 10
   `,
   
   // Throughput performance (last 24 hours)
@@ -268,24 +267,40 @@ export const parseQueryResult = (result, type) => {
 
     case 'networkAvailability':
       return {
-        value: data.length > 0 ? `${data[0]?.avg_availability?.toFixed(2) || '0'}%` : '0%',
+        value: data.length > 0 ? `${data[data.length - 1]?.avg_availability || '0'}%` : '0%',
         chartData: {
           series: [{
             name: 'Availability %',
-            data: data.map(item => parseFloat(item.avg_availability || 0).toFixed(2))
+            data: data.map(item => parseFloat(item.avg_availability || 0))
           }],
-          categories: data.map(item => item.network_name),
-          type: 'bar'
+          categories: data.map(item => {
+            const date = new Date(item.time_day);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          }),
+          type: 'line'
         }
       };
 
     case 'averageLatency':
+      if (!data || data.length === 0) {
+        return {
+          value: '0ms',
+          chartData: {
+            series: [{
+              name: 'Latency (ms)',
+              data: []
+            }],
+            categories: [],
+            type: 'line'
+          }
+        };
+      }
       return {
-        value: data.length > 0 ? `${data[0]?.avg_latency_ms?.toFixed(2) || '0'}ms` : '0ms',
+        value: `${data[0]?.avg_latency_ms?.toFixed(2) || '0'}ms`,
         chartData: {
           series: [{
             name: 'Latency (ms)',
-            data: data.map(item => parseFloat(item.avg_latency_ms || 0).toFixed(2))
+            data: data.map(item => parseFloat(item.avg_latency_ms || 0))
           }],
           categories: data.map(item => item.network_name),
           type: 'line'

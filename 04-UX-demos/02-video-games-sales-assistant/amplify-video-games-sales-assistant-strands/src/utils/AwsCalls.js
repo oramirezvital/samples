@@ -188,6 +188,9 @@ const parseTableResponse = (result, query) => {
       } else if (query.includes('time_hour')) {
         obj.time_hour = row[0];
         obj.avg_availability = parseFloat(row[1]) || 0;
+      } else if (query.includes('time_day') && query.includes('avg_availability')) {
+        obj.time_day = row[0];
+        obj.avg_availability = parseFloat(row[1]) || 0;
       } else if (query.includes('network_name') && query.includes('availability')) {
         obj.network_name = row[0];
         obj.avg_availability = parseFloat(row[1]) || 0;
